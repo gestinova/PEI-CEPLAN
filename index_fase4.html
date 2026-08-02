@@ -820,6 +820,7 @@ async function generarDocumento() {
   const btn = document.getElementById('btnGenerar');
   const msg = document.getElementById('message');
   const payload = construirPayload();
+  const baseUrl = 'http://localhost:8000';
 
   // Mostrar loading
   btn.disabled = true;
@@ -828,33 +829,32 @@ async function generarDocumento() {
   msg.style.display = 'none';
 
   try {
-    const response = await fetch('/generar', {
+    const response = await fetch(`${baseUrl}/generar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    // Leer respuesta como texto primero para detectar errores inesperados
     const texto = await response.text();
     let result;
     try {
       result = JSON.parse(texto);
     } catch {
-      throw new Error('Respuesta inesperada del servidor: ' + texto.substring(0, 300));
+      throw new Error(`Respuesta inesperada del servidor (HTTP ${response.status}). Cuerpo: ${texto.substring(0, 400)}`);
     }
 
-    if (result.success) {
-      msg.className = 'message success';
-      msg.style.display = 'block';
-      const nombreArchivo = result.file;
-      msg.innerHTML = `
-        <strong>✅ ¡Documento generado exitosamente!</strong><br><br>
-        <strong>📄 Archivo:</strong> ${nombreArchivo}<br><br>
-        <a href="/${nombreArchivo}" download class="download-link">📥 Descargar Documento Word</a><br><br>
-        <small>El archivo también se guardó en la carpeta del proyecto.</small>`;
-    } else {
-      throw new Error(result.error || 'Error desconocido del servidor');
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || `Error HTTP ${response.status} al generar el documento`);
     }
+
+    msg.className = 'message success';
+    msg.style.display = 'block';
+    const nombreArchivo = result.file;
+    msg.innerHTML = `
+      <strong>✅ ¡Documento generado exitosamente!</strong><br><br>
+      <strong>📄 Archivo:</strong> ${nombreArchivo}<br><br>
+      <a href="${baseUrl}/${nombreArchivo}" download class="download-link">📥 Descargar Documento Word</a><br><br>
+      <small>El archivo también se guardó en la carpeta del proyecto.</small>`;
   } catch (err) {
     msg.className = 'message error';
     msg.style.display = 'block';

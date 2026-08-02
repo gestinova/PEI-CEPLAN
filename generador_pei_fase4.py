@@ -2,7 +2,24 @@
 # -*- coding: utf-8 -*-
 
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-import json, os, sys, re, subprocess
+import json, os, sys, re, subprocess, importlib.util
+from pathlib import Path
+
+
+def cargar_mailmerge():
+    """Carga explícitamente el `MailMerge` de `docx-mailmerge` sin depender del paquete `mailmerge` CLI."""
+    # El paquete `mailmerge` (CLI) y el paquete `docx-mailmerge` comparten el mismo nombre. Para
+    # evitar la resolución accidental al paquete equivocado, cargamos el módulo por ruta de archivo.
+    module_path = Path(sys.prefix) / 'Lib' / 'site-packages' / 'mailmerge.py'
+    if not module_path.exists():
+        raise FileNotFoundError(f'No se encontró el módulo de docx-mailmerge en: {module_path}')
+
+    spec = importlib.util.spec_from_file_location('docx_mailmerge_module', module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if not hasattr(module, 'MailMerge'):
+        raise AttributeError('El módulo cargado no expone la clase MailMerge esperada.')
+    return module.MailMerge
 
 class PEIHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
@@ -33,16 +50,16 @@ class PEIHandler(SimpleHTTPRequestHandler):
         print("="*70)
 
         try:
-            from mailmerge import MailMerge
+            MailMerge = cargar_mailmerge()
             from docx import Document
             from docx.shared import Pt
             from docx.enum.text import WD_BREAK
             from copy import deepcopy
-        except ImportError:
+        except Exception:
             print("Instalando...")
             subprocess.check_call([sys.executable, "-m", "pip", "install",
                 "docx-mailmerge", "python-docx", "--break-system-packages", "--quiet"])
-            from mailmerge import MailMerge
+            MailMerge = cargar_mailmerge()
             from docx import Document
             from docx.shared import Pt
             from docx.enum.text import WD_BREAK
@@ -396,12 +413,14 @@ class PEIHandler(SimpleHTTPRequestHandler):
         print("="*70)
         return output
 
-httpd = HTTPServer(('', 8000), PEIHandler)
-print("\n" + "="*70)
-print("  GENERADOR PEI - ORDEN JERÁRQUICO")
-print("  http://localhost:8000")
-print("="*70 + "\n")
-try:
-    httpd.serve_forever()
-except KeyboardInterrupt:
-    print("\nDetenido.")
+
+if __name__ == '__main__':
+    httpd = HTTPServer(('', 8000), PEIHandler)
+    print("\n" + "="*70)
+    print("  GENERADOR PEI - ORDEN JERÁRQUICO")
+    print("  http://localhost:8000")
+    print("="*70 + "\n")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nDetenido.")

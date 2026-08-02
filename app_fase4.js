@@ -1033,34 +1033,42 @@ document.getElementById('peiForm').addEventListener('submit', async (e) => {
         
         console.log('Enviando datos al servidor...', savedData);
         
+        const baseUrl = 'http://localhost:8000';
+
         // Enviar datos al servidor
-        const response = await fetch('/generar', {
+        const response = await fetch(`${baseUrl}/generar`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(savedData)
         });
-        
-        const result = await response.json();
+
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch {
+            throw new Error(`Respuesta inesperada del servidor (HTTP ${response.status}). Cuerpo: ${text.substring(0, 400)}`);
+        }
         
         loading.classList.remove('active');
         
-        if (result.success) {
-            // Mostrar mensaje de éxito
-            message.className = 'message success';
-            message.innerHTML = `
-                <strong>✅ ${result.message || '¡Documento generado exitosamente!'}</strong><br><br>
-                <strong>📄 Archivo generado:</strong> ${result.file}<br><br>
-                <a href="${result.file}" download class="download-link">
-                    📥 Descargar Documento
-                </a>
-                <br><br>
-                <small>El documento se ha generado en la carpeta del servidor.</small>
-            `;
-        } else {
-            throw new Error(result.error || 'Error desconocido al generar el documento');
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || `Error HTTP ${response.status} al generar el documento`);
         }
+
+        // Mostrar mensaje de éxito
+        message.className = 'message success';
+        message.innerHTML = `
+            <strong>✅ ${result.message || '¡Documento generado exitosamente!'}</strong><br><br>
+            <strong>📄 Archivo generado:</strong> ${result.file}<br><br>
+            <a href="${baseUrl}/${result.file}" download class="download-link">
+                📥 Descargar Documento
+            </a>
+            <br><br>
+            <small>El documento se ha generado en la carpeta del servidor.</small>
+        `;
         
     } catch (error) {
         loading.classList.remove('active');
