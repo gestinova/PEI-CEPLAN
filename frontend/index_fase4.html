@@ -689,19 +689,15 @@ function agruparPorAEI(indicadores) {
   ).join('');
 }
 
-function obtenerAnios() {
-  const periodoStr = document.getElementById('periodo_pei').value || '';
-  const m = periodoStr.match(/\d{4}/g);
-  if (m && m.length >= 2) {
-    const [ini, fin] = [parseInt(m[0]), parseInt(m[1])];
-    return Array.from({ length: fin - ini + 1 }, (_, i) => ini + i);
-  }
-  return [2026, 2027, 2028, 2029, 2030];
+function obtenerAniosMeta(baseYear) {
+  const base = parseInt(baseYear, 10);
+  if (!baseYear || Number.isNaN(base)) return [];
+  return Array.from({ length: 5 }, (_, i) => base + i + 2);
 }
 
 function crearFormularioMeta(ind) {
   const saved = appState.metas[ind.id] || {};
-  const anios = obtenerAnios();
+  const anios = obtenerAniosMeta(saved.año_base ?? '');
   const aniosHtml = anios.map(a => `
     <div class="meta-field">
       <label>Meta ${a} *</label>
@@ -722,7 +718,7 @@ function crearFormularioMeta(ind) {
         <label>Año Base *</label>
         <input type="number" id="${ind.id}-año_base" class="meta-input" placeholder="2025"
                min="2020" max="2030" value="${saved.año_base ?? ''}"
-               oninput="guardarMeta('${ind.id}','año_base',this.value)">
+               oninput="guardarMeta('${ind.id}','año_base',this.value); actualizarMetaDesdeBaseYear('${ind.id}', this.value)">
       </div>
       <div class="meta-field">
         <label>Valor Base *</label>
@@ -733,6 +729,25 @@ function crearFormularioMeta(ind) {
     </div>
     <div class="meta-años-grid">${aniosHtml}</div>
   </div>`;
+}
+
+function actualizarMetaDesdeBaseYear(indId, valor) {
+  guardarMeta(indId, 'año_base', valor);
+  const card = document.getElementById(`${indId}-año_base`)?.closest('.meta-card');
+  if (!card) return;
+
+  const grid = card.querySelector('.meta-años-grid');
+  if (!grid) return;
+
+  const saved = appState.metas[indId] || {};
+  const anios = obtenerAniosMeta(valor);
+  grid.innerHTML = anios.map(a => `
+    <div class="meta-field">
+      <label>Meta ${a} *</label>
+      <input type="number" id="${indId}-meta_${a}" class="meta-input"
+             placeholder="0" min="0" step="0.01" value="${saved['meta_' + a] ?? ''}"
+             oninput="guardarMeta('${indId}','meta_${a}',this.value)">
+    </div>`).join('');
 }
 
 function guardarMeta(id, campo, valor) {
