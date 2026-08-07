@@ -371,7 +371,7 @@ function configurarAutocompletadoUE() {
   };
 
   inputCodigoUE.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab' || e.key === 'Enter') {
+    if (e.key === 'Enter') {
       console.log('configurarAutocompletadoUE: tecla', e.key, 'presionada');
       e.preventDefault();
       buscarYAutocompletar(e);
