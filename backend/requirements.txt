@@ -1,2 +1,3 @@
 docx-mailmerge
 python-docx
+pandas
