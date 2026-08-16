@@ -11,6 +11,11 @@ let datosSeleccionados = {
 let pasoActual = 1;
 let draggedElement = null;
 let draggedAEIElement = null;
+const API_BASE_URL = String(window.PEI_API_BASE_URL || '').replace(/\/+$/, '');
+
+function apiUrl(path) {
+    return `${API_BASE_URL}${path}`;
+}
 
 // Cargar matriz estándar al iniciar
 window.addEventListener('load', async () => {
@@ -24,7 +29,7 @@ window.addEventListener('load', async () => {
 
 async function cargarMatrizEstandar() {
     try {
-        const response = await fetch('matriz_estandar.json');
+        const response = await fetch(apiUrl('/matriz_estandar.json'));
         matrizEstandar = await response.json();
         renderizarOEIs();
     } catch (error) {
@@ -1033,10 +1038,8 @@ document.getElementById('peiForm').addEventListener('submit', async (e) => {
         
         console.log('Enviando datos al servidor...', savedData);
         
-        const baseUrl = 'http://localhost:8000';
-
         // Enviar datos al servidor
-        const response = await fetch(`${baseUrl}/generar`, {
+        const response = await fetch(apiUrl('/generar'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1063,7 +1066,7 @@ document.getElementById('peiForm').addEventListener('submit', async (e) => {
         message.innerHTML = `
             <strong>✅ ${result.message || '¡Documento generado exitosamente!'}</strong><br><br>
             <strong>📄 Archivo generado:</strong> ${result.file}<br><br>
-            <a href="${baseUrl}/${result.file}" download class="download-link">
+            <a href="${apiUrl(`/downloads/${encodeURIComponent(result.file)}`)}" download class="download-link">
                 📥 Descargar Documento
             </a>
             <br><br>
