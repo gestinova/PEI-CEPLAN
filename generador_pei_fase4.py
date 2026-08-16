@@ -14,7 +14,16 @@ MAX_PAYLOAD_BYTES = 1024 * 1024
 MAX_MUNICIPALITY_LENGTH = 120
 ORDENANZA_PLACEHOLDER = '«Ordenanza_PDC»'
 ANEXO_FICHAS_MARKER = 'ANEXO A - 6'
+ANEXO_B1_MARKER = 'ANEXO B - 1:'
+ANEXO_B2_MARKER = 'ANEXO B - 2'
+ANEXO_B1_SENTENCE_PREFIX = 'El PEI está articulado al'
+ANIO_BASE_KEY = 'anio_base'
 PERIODO_PATTERN = re.compile(r'^\s*(\d{4})\s*[-–—]\s*(\d{4})\s*$')
+OEI_CODE_PATTERN = re.compile(r'^OEI\.\d+$')
+AEI_CODE_PATTERN = re.compile(r'^AEI\.(\d{2})\.(\d{2})$')
+VISIBLE_CODE_PATTERN = re.compile(
+    r'(?<![A-Za-z0-9_.-])(OEI\.\d+|AEI\.\d+\.\d+)(?![A-Za-z0-9_.-])'
+)
 STATIC_FILE_ALLOWLIST = {
     '/': 'index_fase4.html',
     '/index_fase4.html': 'index_fase4.html',
@@ -275,6 +284,45 @@ def asegurar_salto_de_pagina_antes(paragraph):
             p_pr.append(ElementTree.Element(_w_tag('pageBreakBefore')))
 
 
+def _reemplazar_placeholder_en_parrafo(paragraph, placeholder, value):
+    runs = list(paragraph.runs)
+    textos = [run.text or '' for run in runs]
+    texto_completo = ''.join(textos)
+    matches = list(re.finditer(re.escape(placeholder), texto_completo))
+    if not matches:
+        return False
+
+    offsets = []
+    offset = 0
+    for texto in textos:
+        offsets.append((offset, offset + len(texto)))
+        offset += len(texto)
+
+    nuevos_textos = []
+    for run_start, run_end in offsets:
+        cursor = run_start
+        partes = []
+        for match in matches:
+            match_start, match_end = match.span()
+            if match_end <= run_start:
+                continue
+            if match_start >= run_end:
+                break
+            if match_start >= run_start:
+                partes.append(texto_completo[cursor:match_start])
+                partes.append(str(value))
+                cursor = match_end
+            else:
+                cursor = max(cursor, match_end)
+        partes.append(texto_completo[cursor:run_end])
+        nuevos_textos.append(''.join(partes))
+
+    for run, nuevo_texto, texto_original in zip(runs, nuevos_textos, textos):
+        if nuevo_texto != texto_original:
+            run.text = nuevo_texto
+    return True
+
+
 def reemplazar_placeholder_docx(document, placeholder, value):
     paragraphs = list(document.paragraphs)
     for table in document.tables:
@@ -282,13 +330,172 @@ def reemplazar_placeholder_docx(document, placeholder, value):
             for cell in row.cells:
                 paragraphs.extend(cell.paragraphs)
     for paragraph in paragraphs:
-        if placeholder not in paragraph.text:
+        _reemplazar_placeholder_en_parrafo(paragraph, placeholder, value)
+
+
+def construir_mapeo_codigos_display(oei_ordenados, aei_ordenados=None):
+    """Build visible OEI/AEI numbering from the final priority order."""
+    if not isinstance(oei_ordenados, (list, tuple)):
+        return {}
+    mapping = {
+        codigo: f'OEI.{index:02d}'
+        for index, codigo in enumerate(oei_ordenados, 1)
+        if isinstance(codigo, str) and OEI_CODE_PATTERN.fullmatch(codigo)
+    }
+    if not isinstance(aei_ordenados, dict):
+        return mapping
+
+    for codigo_oei, codigos_aei in aei_ordenados.items():
+        oei_display = mapping.get(codigo_oei)
+        if not oei_display or not isinstance(codigos_aei, (list, tuple)):
             continue
-        for run in paragraph.runs:
-            if placeholder in run.text:
-                run.text = run.text.replace(placeholder, value)
-        if placeholder in paragraph.text:
-            paragraph.text = paragraph.text.replace(placeholder, value)
+        oei_display_num = oei_display.split('.', 1)[1]
+        aei_display_index = 1
+        for codigo_aei in codigos_aei:
+            match = (
+                AEI_CODE_PATTERN.fullmatch(codigo_aei)
+                if isinstance(codigo_aei, str)
+                else None
+            )
+            if not match or f'OEI.{match.group(1)}' != codigo_oei:
+                continue
+            mapping[codigo_aei] = f'AEI.{oei_display_num}.{aei_display_index:02d}'
+            aei_display_index += 1
+    return mapping
+
+
+def remapear_codigo_aei(codigo, mapeo_oei):
+    """Remap a selected AEI to its complete visible code."""
+    match = AEI_CODE_PATTERN.fullmatch(codigo or '')
+    if not match or not isinstance(mapeo_oei, dict):
+        return codigo
+    return mapeo_oei.get(codigo, codigo)
+
+
+def _iterar_parrafos_docx(document):
+    """Yield body, table, header and footer paragraphs once."""
+    seen = set()
+
+    def visitar_contenedor(container):
+        for paragraph in getattr(container, 'paragraphs', ()):
+            key = paragraph._p
+            if key not in seen:
+                seen.add(key)
+                yield paragraph
+        for table in getattr(container, 'tables', ()):
+            for row in table.rows:
+                for cell in row.cells:
+                    yield from visitar_contenedor(cell)
+
+    yield from visitar_contenedor(document)
+    for section in document.sections:
+        for container in (
+            section.header,
+            section.first_page_header,
+            section.even_page_header,
+            section.footer,
+            section.first_page_footer,
+            section.even_page_footer,
+            ):
+            yield from visitar_contenedor(container)
+
+
+def _formatear_run_anexo_b1(run):
+    from docx.oxml import OxmlElement
+
+    r_pr = run._r.get_or_add_rPr()
+    r_fonts = r_pr.get_or_add_rFonts()
+    for attribute in ('ascii', 'eastAsia', 'hAnsi', 'cs'):
+        r_fonts.set(_w_tag(attribute), 'Arial Narrow')
+
+    for size_name in ('sz', 'szCs'):
+        size = r_pr.find(_w_tag(size_name))
+        if size is None:
+            size = OxmlElement(f'w:{size_name}')
+            r_pr.append(size)
+        size.set(_w_tag('val'), '24')
+
+
+def formatear_oracion_anexo_b1(document):
+    """Format only the articulation sentence in Anexo B.1."""
+    en_anexo_b1 = False
+    formatted = 0
+    from docx.text.run import Run
+
+    for paragraph in document.paragraphs:
+        texto = paragraph.text.strip()
+        if texto.startswith(ANEXO_B1_MARKER):
+            en_anexo_b1 = True
+            continue
+        if texto.startswith(ANEXO_B2_MARKER):
+            en_anexo_b1 = False
+            continue
+        if not en_anexo_b1 or not texto.startswith(ANEXO_B1_SENTENCE_PREFIX):
+            continue
+
+        runs = [Run(element, paragraph) for element in paragraph._p.iter(_w_tag('r'))]
+        for run in runs:
+            _formatear_run_anexo_b1(run)
+        formatted += 1
+
+    return formatted
+
+
+def _remapear_parrafo_docx(paragraph, mapeo_oei):
+    from docx.text.run import Run
+
+    runs = [Run(element, paragraph) for element in paragraph._p.iter(_w_tag('r'))]
+    textos = [run.text or '' for run in runs]
+    texto_completo = ''.join(textos)
+    matches = list(VISIBLE_CODE_PATTERN.finditer(texto_completo))
+    if not matches:
+        return 0
+
+    offsets = []
+    offset = 0
+    for texto in textos:
+        offsets.append((offset, offset + len(texto)))
+        offset += len(texto)
+
+    def remapear(match):
+        codigo = match.group(1)
+        if codigo.startswith('OEI.'):
+            return mapeo_oei.get(codigo, codigo)
+        return remapear_codigo_aei(codigo, mapeo_oei)
+
+    nuevos_textos = []
+    for run_start, run_end in offsets:
+        cursor = run_start
+        partes = []
+        for match in matches:
+            match_start, match_end = match.span()
+            if match_end <= run_start:
+                continue
+            if match_start >= run_end:
+                break
+            if match_start >= run_start:
+                partes.append(texto_completo[cursor:match_start])
+                partes.append(remapear(match))
+                cursor = match_end
+            else:
+                cursor = max(cursor, match_end)
+        partes.append(texto_completo[cursor:run_end])
+        nuevos_textos.append(''.join(partes))
+
+    for run, nuevo_texto, texto_original in zip(runs, nuevos_textos, textos):
+        if nuevo_texto != texto_original:
+            run.text = nuevo_texto
+    return sum(remapear(match) != match.group(1) for match in matches)
+
+
+def remapear_codigos_visibles_docx(document, mapeo_oei):
+    """Remap visible OEI/AEI codes without changing internal selection keys."""
+    if not isinstance(mapeo_oei, dict):
+        return 0
+    return sum(
+        _remapear_parrafo_docx(paragraph, mapeo_oei)
+        for paragraph in _iterar_parrafos_docx(document)
+    )
 
 
 def parsear_id_indicador(indicator_id):
@@ -304,6 +511,18 @@ def parsear_id_indicador(indicator_id):
     return None
 
 
+def _normalizar_anio_base(record):
+    if not isinstance(record, dict):
+        return record
+
+    normalized = dict(record)
+    if ANIO_BASE_KEY not in normalized or normalized[ANIO_BASE_KEY] in (None, ''):
+        if 'año_base' in normalized:
+            normalized[ANIO_BASE_KEY] = normalized['año_base']
+    normalized.pop('año_base', None)
+    return normalized
+
+
 def indexar_metas(metas_raw):
     """Index metas by indicator code and the ordinal encoded in its id."""
     indexed = {}
@@ -313,12 +532,13 @@ def indexar_metas(metas_raw):
     for indicator_id, meta in metas_raw.items():
         parsed = parsear_id_indicador(indicator_id)
         if parsed and isinstance(meta, dict):
-            indexed[parsed] = meta
+            indexed[parsed] = _normalizar_anio_base(meta)
     return indexed
 
 
 def _anio_de_ficha(ficha):
-    value = ficha.get('anio_base', ficha.get('año_base', '')) if isinstance(ficha, dict) else ''
+    normalized = _normalizar_anio_base(ficha)
+    value = normalized.get(ANIO_BASE_KEY, '') if isinstance(normalized, dict) else ''
     match = re.search(r'\d{4}', str(value))
     return int(match.group()) if match else None
 
@@ -360,7 +580,8 @@ def indexar_fichas(fichas_db):
     for codigo, records in (fichas_db or {}).items():
         ordinal = -1
         previous_year = None
-        for ficha in records if isinstance(records, list) else []:
+        for raw_ficha in records if isinstance(records, list) else []:
+            ficha = _normalizar_anio_base(raw_ficha)
             year = _anio_de_ficha(ficha)
             if year is None:
                 continue
@@ -404,6 +625,27 @@ def seleccionar_ficha_base(fichas_index, codigo, ordinal, anios_periodo):
     if not baseline_records:
         return None
     return baseline_records[min(baseline_records)]
+
+
+def resolver_linea_base_ficha(ficha, meta):
+    """Override both ficha baseline fields only when the form sends both."""
+    ficha_normalizada = _normalizar_anio_base(ficha)
+    if not isinstance(ficha_normalizada, dict):
+        return ficha_normalizada
+
+    meta_normalizada = _normalizar_anio_base(meta)
+    if not isinstance(meta_normalizada, dict):
+        return ficha_normalizada
+
+    anio_base = meta_normalizada.get(ANIO_BASE_KEY)
+    valor_base = meta_normalizada.get('valor_base')
+    if anio_base in (None, '') or valor_base in (None, ''):
+        return ficha_normalizada
+
+    resolved = dict(ficha_normalizada)
+    resolved[ANIO_BASE_KEY] = anio_base
+    resolved['valor_absoluto'] = valor_base
+    return resolved
 
 
 def extraer_anios_periodo(periodo):
@@ -584,13 +826,16 @@ def _validar_metas(metas, errors):
         for name, value in meta.items():
             if value is None or value == '':
                 continue
+            numeric_value = None
             if isinstance(value, bool):
                 valid = False
             elif isinstance(value, (int, float)):
-                valid = math.isfinite(value)
+                numeric_value = value
+                valid = math.isfinite(numeric_value)
             elif isinstance(value, str):
                 try:
-                    valid = math.isfinite(float(value.strip()))
+                    numeric_value = float(value.strip())
+                    valid = math.isfinite(numeric_value)
                 except ValueError:
                     valid = False
             else:
@@ -600,6 +845,15 @@ def _validar_metas(metas, errors):
                     'field': f'{field}.{name}',
                     'code': 'invalid_type',
                     'message': 'El valor de la meta debe ser numérico o estar vacío.'
+                })
+            elif (
+                (name == 'valor_base' or re.fullmatch(r'meta_\d{4}', str(name)))
+                and numeric_value < 0
+            ):
+                errors.append({
+                    'field': f'{field}.{name}',
+                    'code': 'negative_value',
+                    'message': 'El valor de la meta no puede ser negativo.'
                 })
 
 
@@ -1207,6 +1461,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
         print("\nPASO 2: Filtrar...")
         doc = Document(temp1)
         reemplazar_placeholder_docx(doc, ORDENANZA_PLACEHOLDER, d['ordenanza_pdc'])
+        formatear_oracion_anexo_b1(doc)
 
         # Construir mapa de indices seleccionados por codigo
         ind_oei_sel = sel.get('indicadoresOEI', [])
@@ -1237,7 +1492,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
         indicador_ordinal_por_clave = {}
 
         def registrar_ordinal(row, codigo, ordinal):
-            indicador_ordinal_por_fila[id(row._tr)] = ordinal
+            indicador_ordinal_por_fila[row._tr] = ordinal
             indicador_ordinal_por_clave[
                 (codigo, tuple(cell.text.strip() for cell in row.cells))
             ] = ordinal
@@ -1472,7 +1727,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                 if not m:
                     continue
                 codigo = m.group()
-                ordinal = indicador_ordinal_por_fila.get(id(row._tr))
+                ordinal = indicador_ordinal_por_fila.get(row._tr)
                 if ordinal is None:
                     ordinal = indicador_ordinal_por_clave.get(
                         (codigo, tuple(cell.text.strip() for cell in cs))
@@ -1483,7 +1738,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                 meta = metas_por_indicador.get((codigo, ordinal))
                 if meta is None:
                     continue
-                esc(cs[3], fmt(get(meta, ['año_base', 'anio_base'])))
+                esc(cs[3], fmt(get(meta, [ANIO_BASE_KEY])))
                 esc(cs[4], fmt(get(meta, ['valor_base'])))
                 for year, column in anio_columnas.items():
                     if column >= len(cs):
@@ -1532,6 +1787,10 @@ class PEIHandler(SimpleHTTPRequestHandler):
             if ficha is None:
                 print(f"  Aviso: {codigo} indicador {ordinal} no tiene ficha en JSON")
                 continue
+            ficha = resolver_linea_base_ficha(
+                ficha,
+                metas_por_indicador.get((codigo, ordinal)),
+            )
 
             # Copiar tabla
             nt = deepcopy(tbl_plt._element)
@@ -1567,7 +1826,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
             stxt(7, 1, ficha.get('sentido_esperado', ''))
             stxt(8, 1, ficha.get('proceso_recoleccion', ''))
             stxt(9, 1, ficha.get('fuente_datos', ''))
-            stxt(11, 1, ficha.get('anio_base', ficha.get('año_base', '')))
+            stxt(11, 1, ficha.get(ANIO_BASE_KEY, ''))
             stxt(12, 1, ficha.get('valor_relativo', ''))
             stxt(13, 1, valor_absoluto_ficha(ficha))
             for column in ficha_anio_columnas.values():
@@ -1587,6 +1846,11 @@ class PEIHandler(SimpleHTTPRequestHandler):
 
         output = output_path or f"PEI_{sanitizar_nombre_municipio(d['nombre_municipio'])}.docx"
         limpiar_parrafos_body_vacios_finales(doc_base.element.body)
+        mapeo_codigos_display = construir_mapeo_codigos_display(
+            oei_ordenados,
+            aei_ordenados,
+        )
+        remapear_codigos_visibles_docx(doc_base, mapeo_codigos_display)
         doc_base.save(output)
 
         print(f"\nGENERADO: {output}")

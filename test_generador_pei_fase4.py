@@ -1,6 +1,7 @@
 import contextlib
 import os
 import re
+import shutil
 import sys
 import tempfile
 import types
@@ -15,6 +16,7 @@ from generador_pei_fase4 import (
     PayloadValidationError,
     PEIHandler,
     construir_fichas_seleccionadas,
+    construir_mapeo_codigos_display,
     extraer_anios_periodo,
     indexar_fichas,
     indexar_metas,
@@ -24,9 +26,13 @@ from generador_pei_fase4 import (
     asegurar_salto_de_pagina_antes,
     eliminar_parrafos_con_texto,
     extraer_nota_ficha,
+    formatear_oracion_anexo_b1,
     normalizar_bordes_tabla,
     reemplazar_placeholder_docx,
+    remapear_codigo_aei,
+    remapear_codigos_visibles_docx,
     resolver_anios_columnas,
+    resolver_linea_base_ficha,
     sanitizar_nombre_municipio,
     seleccionar_ficha_base,
     validar_payload,
@@ -208,6 +214,124 @@ class ValidarPayloadTests(unittest.TestCase):
 
         self.assertIn('invalid_type', {error['code'] for error in context.exception.errors})
 
+    def test_rejects_negative_values_in_baseline_and_annual_targets(self):
+        for field in ('valor_base', 'meta_2026'):
+            with self.subTest(field=field):
+                data = payload(
+                    ['OEI.01'],
+                    ['AEI.01.01'],
+                    ['OEI.01'],
+                    {'OEI.01': ['AEI.01.01']},
+                )
+                data['metas'] = {
+                    'ind-oei-OEI.01-0': {
+                        'año_base': 2024,
+                        field: -1,
+                    }
+                }
+
+                with self.assertRaises(PayloadValidationError) as context:
+                    validar_payload(data, MATRIZ)
+
+                errors = context.exception.errors
+                self.assertIn('negative_value', {error['code'] for error in errors})
+                self.assertIn(f'metas.ind-oei-OEI.01-0.{field}', {error['field'] for error in errors})
+
+    def test_accepts_zero_positive_values_and_period_years(self):
+        data = payload(
+            ['OEI.01'],
+            ['AEI.01.01'],
+            ['OEI.01'],
+            {'OEI.01': ['AEI.01.01']},
+        )
+        data['periodo_pei'] = '2027-2032'
+        data['metas'] = {
+            'ind-oei-OEI.01-0': {
+                'año_base': 2031,
+                'valor_base': 0,
+                'meta_2027': 0,
+                'meta_2032': 12.5,
+            }
+        }
+
+        self.assertEqual(validar_payload(data, MATRIZ), {
+            'oei': ['OEI.01'],
+            'aei': {'OEI.01': ['AEI.01.01']},
+        })
+
+
+class DisplayCodeMappingTests(unittest.TestCase):
+    def test_builds_sequential_display_codes_from_priority_order(self):
+        ordered = ['OEI.01', 'OEI.04', 'OEI.10']
+
+        self.assertEqual(construir_mapeo_codigos_display(ordered), {
+            'OEI.01': 'OEI.01',
+            'OEI.04': 'OEI.02',
+            'OEI.10': 'OEI.03',
+        })
+        self.assertEqual(ordered, ['OEI.01', 'OEI.04', 'OEI.10'])
+
+    def test_remaps_first_selected_aei_to_visible_one(self):
+        mapping = construir_mapeo_codigos_display(
+            ['OEI.01'],
+            {'OEI.01': ['AEI.01.05']},
+        )
+
+        self.assertEqual(remapear_codigo_aei('AEI.01.05', mapping), 'AEI.01.01')
+
+    def test_remaps_selected_aei_in_priority_order(self):
+        aei_priority = ['AEI.01.05', 'AEI.01.07']
+        mapping = construir_mapeo_codigos_display(
+            ['OEI.01'],
+            {'OEI.01': aei_priority},
+        )
+
+        self.assertEqual(remapear_codigo_aei('AEI.01.05', mapping), 'AEI.01.01')
+        self.assertEqual(remapear_codigo_aei('AEI.01.07', mapping), 'AEI.01.02')
+        self.assertEqual(aei_priority, ['AEI.01.05', 'AEI.01.07'])
+
+    def test_remaps_aei_parent_and_local_priority(self):
+        mapping = construir_mapeo_codigos_display(
+            ['OEI.01', 'OEI.04', 'OEI.10'],
+            {
+                'OEI.01': ['AEI.01.01'],
+                'OEI.04': ['AEI.04.02'],
+                'OEI.10': ['AEI.10.01'],
+            },
+        )
+
+        self.assertEqual(remapear_codigo_aei('AEI.04.02', mapping), 'AEI.02.01')
+        self.assertEqual(remapear_codigo_aei('AEI.10.01', mapping), 'AEI.03.01')
+        self.assertEqual(remapear_codigo_aei('AEI.02.01', mapping), 'AEI.02.01')
+
+    def test_docx_code_remap_keeps_run_styles_and_internal_codes(self):
+        from docx import Document
+
+        document = Document()
+        paragraph = document.add_paragraph()
+        prefix = paragraph.add_run('Acciones del OEI.')
+        prefix.bold = True
+        suffix = paragraph.add_run('04 y AEI.04.02')
+        table = document.add_table(rows=1, cols=1)
+        table.cell(0, 0).text = 'Ficha OEI.10 / AEI.10.01'
+        internal_ids = document.add_paragraph('ind-oei-OEI.04-0 / oei-OEI.04')
+        mapping = construir_mapeo_codigos_display(
+            ['OEI.01', 'OEI.04', 'OEI.10'],
+            {
+                'OEI.01': ['AEI.01.01'],
+                'OEI.04': ['AEI.04.02'],
+                'OEI.10': ['AEI.10.01'],
+            },
+        )
+
+        remapear_codigos_visibles_docx(document, mapping)
+
+        self.assertEqual(paragraph.text, 'Acciones del OEI.02 y AEI.02.01')
+        self.assertTrue(prefix.bold)
+        self.assertEqual(suffix.text, ' y AEI.02.01')
+        self.assertEqual(table.cell(0, 0).text, 'Ficha OEI.03 / AEI.03.01')
+        self.assertEqual(internal_ids.text, 'ind-oei-OEI.04-0 / oei-OEI.04')
+
 
 class DataCorrelationTests(unittest.TestCase):
     def test_metas_are_indexed_by_indicator_ordinal(self):
@@ -218,6 +342,38 @@ class DataCorrelationTests(unittest.TestCase):
 
         self.assertEqual(metas[('AEI.02.01', 0)]['meta_2026'], 10)
         self.assertEqual(metas[('AEI.02.01', 1)]['meta_2026'], 20)
+
+    def test_base_year_aliases_are_normalized_to_anio_base(self):
+        normalized = []
+        for alias in ('año_base', 'anio_base'):
+            meta = indexar_metas({
+                'ind-oei-OEI.01-0': {alias: 2031, 'valor_base': 0},
+            })[('OEI.01', 0)]
+            normalized.append(meta)
+
+        self.assertEqual(normalized[0], normalized[1])
+        self.assertEqual(normalized[0]['anio_base'], 2031)
+        self.assertNotIn('año_base', normalized[0])
+
+    def test_ficha_baseline_uses_form_values_atomically_and_falls_back(self):
+        ficha = {'año_base': '2024', 'valor_absoluto': 'json-value'}
+
+        overridden = resolver_linea_base_ficha(
+            ficha,
+            {'anio_base': 2031, 'valor_base': 0},
+        )
+        self.assertEqual(overridden['anio_base'], 2031)
+        self.assertEqual(overridden['valor_absoluto'], 0)
+
+        for incomplete_meta in (
+            {'anio_base': 2031, 'valor_base': ''},
+            {'anio_base': '', 'valor_base': 55},
+            {},
+        ):
+            with self.subTest(meta=incomplete_meta):
+                fallback = resolver_linea_base_ficha(ficha, incomplete_meta)
+                self.assertEqual(fallback['anio_base'], '2024')
+                self.assertEqual(fallback['valor_absoluto'], 'json-value')
 
     def test_fichas_keep_ordinal_and_all_annual_records(self):
         years = [2024, 2026, 2027, 2028, 2029, 2030]
@@ -314,6 +470,27 @@ class XmlCleanupTests(unittest.TestCase):
 
         self.assertEqual(document.paragraphs[0].text, 'Ordenanza N.º 002-2024-MDL')
         self.assertNotIn('«Ordenanza_PDC»', document.paragraphs[0].text)
+
+    def test_split_placeholder_replacement_preserves_run_properties(self):
+        from docx import Document
+        from docx.shared import RGBColor
+
+        document = Document()
+        paragraph = document.add_paragraph()
+        first = paragraph.add_run('«Ordenanza_')
+        first.bold = True
+        first.font.color.rgb = RGBColor(0x12, 0x34, 0x56)
+        second = paragraph.add_run('PDC»')
+        second.italic = True
+        second.font.color.rgb = RGBColor(0x65, 0x43, 0x21)
+
+        reemplazar_placeholder_docx(document, '«Ordenanza_PDC»', '002-2024-MDL')
+
+        self.assertEqual(paragraph.text, '002-2024-MDL')
+        self.assertTrue(first.bold)
+        self.assertEqual(first.font.color.rgb, RGBColor(0x12, 0x34, 0x56))
+        self.assertTrue(second.italic)
+        self.assertEqual(second.font.color.rgb, RGBColor(0x65, 0x43, 0x21))
 
     def test_placeholder_paragraph_is_removed_without_touching_sectpr(self):
         namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -569,6 +746,47 @@ def _ordered_generation_payload():
     }
 
 
+def _catalog_display_payload():
+    indicator_ids = [
+        'ind-oei-OEI.01-0',
+        'ind-oei-OEI.04-0',
+        'ind-oei-OEI.10-0',
+        'ind-aei-AEI.01.05-0',
+        'ind-aei-AEI.04.02-0',
+        'ind-aei-AEI.10.01-0',
+    ]
+    return {
+        'codigo_ue': '150101',
+        'nombre_municipio': 'Municipio Catalogo',
+        'periodo_pei': '2026-2030',
+        'ordenanza_pdc': '002-2024-MDL',
+        'selecciones': {
+            'oei': ['oei-OEI.01', 'oei-OEI.04', 'oei-OEI.10'],
+            'aei': ['aei-AEI.01.05', 'aei-AEI.04.02', 'aei-AEI.10.01'],
+            'indicadoresOEI': indicator_ids[:3],
+            'indicadoresAEI': indicator_ids[3:],
+        },
+        'prioridades': {
+            'oei': ['OEI.01', 'OEI.04', 'OEI.10'],
+            'aei': {
+                'OEI.01': ['AEI.01.05'],
+                'OEI.04': ['AEI.04.02'],
+                'OEI.10': ['AEI.10.01'],
+            },
+        },
+        'metas': {
+            indicator_id: {
+                'año_base': 2024,
+                'valor_base': index + 1,
+                'meta_2026': index + 10,
+                'meta_2027': index + 20,
+                'meta_2030': index + 30,
+            }
+            for index, indicator_id in enumerate(indicator_ids)
+        },
+    }
+
+
 def _partial_indicator_payload():
     return {
         'codigo_ue': '150101',
@@ -609,6 +827,104 @@ def _has_page_break_before(paragraph):
 
 
 class FreshDocxGenerationTests(unittest.TestCase):
+    def test_payload_baseline_overrides_json_in_matrix_and_ficha(self):
+        data = _fresh_payload('2027-2032')
+        data['metas']['ind-oei-OEI.01-0'].update({
+            'año_base': 2031,
+            'valor_base': 901.5,
+        })
+        data['metas']['ind-aei-AEI.01.01-0'].update({
+            'anio_base': 2032,
+            'valor_base': 0,
+        })
+
+        root = _generate_document_xml(data)
+        tables = root.findall(f'.//{{{WORD_NS}}}tbl')
+        matrix = next(
+            table for table in tables
+            if 'Código' in _xml_text(table)
+            and 'Logros Esperados' in _xml_text(table)
+        )
+        expected = {
+            'OEI.01': ('2031', '901.5'),
+            'AEI.01.01': ('2032', '0'),
+        }
+        for code, baseline in expected.items():
+            row = next(
+                row for row in _table_rows(matrix)
+                if _xml_text(_table_cells(row)[0]).strip() == code
+            )
+            cells = _table_cells(row)
+            self.assertEqual((_xml_text(cells[3]), _xml_text(cells[4])), baseline)
+
+        ficha_tables = [
+            table for table in tables
+            if 'FICHA TÉCNICA DEL INDICADOR' in _xml_text(table)
+        ]
+        for table in ficha_tables:
+            code = re.search(
+                r'Objetivo/Acción:(OEI\.\d{2}|AEI\.\d{2}\.\d{2})',
+                _xml_text(table),
+            ).group(1)
+            baseline_row = _table_rows(table)[11]
+            absolute_row = _table_rows(table)[13]
+            self.assertEqual(
+                (_xml_text(_table_cells(baseline_row)[1]),
+                 _xml_text(_table_cells(absolute_row)[1])),
+                expected[code],
+            )
+
+    def test_same_aei_indicator_ordinals_keep_their_baselines(self):
+        data = _partial_indicator_payload()
+        data['selecciones']['indicadoresAEI'] = [
+            'ind-aei-AEI.02.01-0',
+            'ind-aei-AEI.02.01-1',
+        ]
+        data['metas']['ind-aei-AEI.02.01-0'].update({
+            'año_base': 2031,
+            'valor_base': 0,
+        })
+        data['metas']['ind-aei-AEI.02.01-1'].update({
+            'anio_base': 2032,
+            'valor_base': 222,
+        })
+
+        root = _generate_document_xml(data)
+        tables = root.findall(f'.//{{{WORD_NS}}}tbl')
+        matrix = next(
+            table for table in tables
+            if 'OEI/AEI' in _xml_text(table)
+            and 'Logros Esperados' in _xml_text(table)
+        )
+        rows = [
+            row for row in _table_rows(matrix)
+            if _table_cells(row)
+            and _xml_text(_table_cells(row)[0]).strip() == 'AEI.01.01'
+        ]
+        self.assertEqual(
+            [
+                (_xml_text(_table_cells(row)[3]), _xml_text(_table_cells(row)[4]))
+                for row in rows
+            ],
+            [('2031', '0'), ('2032', '222')],
+        )
+
+        ficha_tables = [
+            table for table in tables
+            if 'FICHA TÉCNICA DEL INDICADOR' in _xml_text(table)
+        ]
+        self.assertEqual(len(ficha_tables), 2)
+        self.assertEqual(
+            [
+                (
+                    _xml_text(_table_cells(_table_rows(table)[11])[1]),
+                    _xml_text(_table_cells(_table_rows(table)[13])[1]),
+                )
+                for table in ficha_tables
+            ],
+            [('2031', '0'), ('2032', '222')],
+        )
+
     def test_fresh_docx_preserves_period_selection_and_xml_contract(self):
         for period in ('2027-2032', '2024-2029'):
             with self.subTest(period=period), tempfile.TemporaryDirectory() as temp_dir:
@@ -720,6 +1036,82 @@ class FreshDocxGenerationTests(unittest.TestCase):
                     1,
                 )
 
+    def test_anexo_b1_typography_is_scoped_to_target_sentence(self):
+        from docx import Document
+        from docx.shared import Pt
+
+        with tempfile.TemporaryDirectory() as template_dir, tempfile.TemporaryDirectory() as output_dir:
+            template_dir = Path(template_dir)
+            shutil.copy(WORKTREE / 'PEI_Estandar_-_Informe.docx', template_dir)
+            shutil.copy(WORKTREE / 'Plantilla_de_ficha_técnica.docx', template_dir)
+
+            template_path = template_dir / 'PEI_Estandar_-_Informe.docx'
+            template = Document(template_path)
+            control = next(
+                paragraph for paragraph in template.paragraphs
+                if paragraph.text.startswith('ANEXO B - 2')
+            )
+            control.runs[0].font.name = 'Calibri'
+            control.runs[0].font.size = Pt(9)
+            template.save(template_path)
+
+            output_path = Path(output_dir) / 'generated.docx'
+            handler = object.__new__(PEIHandler)
+            with _mailmerge_adapter():
+                handler.generar_documento(
+                    _fresh_payload('2027-2032'),
+                    template_dir=template_dir,
+                    output_path=output_path,
+                )
+
+            with zipfile.ZipFile(output_path) as archive:
+                root = ET.fromstring(archive.read('word/document.xml'))
+
+        body = root.find(f'{{{WORD_NS}}}body')
+        paragraphs = body.findall(f'{{{WORD_NS}}}p')
+        target = next(
+            paragraph for paragraph in paragraphs
+            if _xml_text(paragraph).startswith('El PEI está articulado al')
+        )
+        target_runs = target.findall(f'.//{{{WORD_NS}}}r')
+        self.assertTrue(target_runs)
+        for run in target_runs:
+            r_pr = run.find(f'{{{WORD_NS}}}rPr')
+            r_fonts = r_pr.find(f'{{{WORD_NS}}}rFonts')
+            self.assertEqual(
+                {name: r_fonts.get(f'{{{WORD_NS}}}{name}') for name in ('ascii', 'eastAsia', 'hAnsi', 'cs')},
+                {name: 'Arial Narrow' for name in ('ascii', 'eastAsia', 'hAnsi', 'cs')},
+            )
+            self.assertEqual(r_pr.find(f'{{{WORD_NS}}}sz').get(f'{{{WORD_NS}}}val'), '24')
+            self.assertEqual(r_pr.find(f'{{{WORD_NS}}}szCs').get(f'{{{WORD_NS}}}val'), '24')
+
+        self.assertIn(
+            'FF0000',
+            {
+                run.find(f'{{{WORD_NS}}}rPr/{{{WORD_NS}}}color').get(f'{{{WORD_NS}}}val')
+                for run in target_runs
+                if run.find(f'{{{WORD_NS}}}rPr/{{{WORD_NS}}}color') is not None
+            },
+        )
+
+        control = next(
+            paragraph for paragraph in paragraphs
+            if _xml_text(paragraph).startswith('ANEXO B - 2')
+        )
+        control_r_pr = control.find(f'{{{WORD_NS}}}r/{{{WORD_NS}}}rPr')
+        self.assertEqual(
+            control_r_pr.find(f'{{{WORD_NS}}}rFonts').get(f'{{{WORD_NS}}}ascii'),
+            'Calibri',
+        )
+        self.assertEqual(
+            control_r_pr.find(f'{{{WORD_NS}}}sz').get(f'{{{WORD_NS}}}val'),
+            '18',
+        )
+        self.assertEqual(
+            control.find(f'{{{WORD_NS}}}r/{{{WORD_NS}}}rPr/{{{WORD_NS}}}b') is not None,
+            True,
+        )
+
     def test_generation_wrapper_cleans_temporary_file_on_success(self):
         handler = object.__new__(PEIHandler)
         created = {}
@@ -732,6 +1124,43 @@ class FreshDocxGenerationTests(unittest.TestCase):
 
         self.assertEqual(handler.generar_documento({}), 'output.docx')
         self.assertFalse(os.path.exists(created['path']))
+
+    def test_catalog_codes_are_remapped_only_in_visible_docx_xml(self):
+        data = _catalog_display_payload()
+        root = _generate_document_xml(data)
+        full_text = _xml_text(root)
+        visible_codes = set(re.findall(
+            r'(?<![A-Za-z0-9_.-])(OEI\.\d{2}|AEI\.\d{2}\.\d{2})(?![A-Za-z0-9_.-])',
+            full_text,
+        ))
+        display_codes = {
+            'OEI.01', 'OEI.02', 'OEI.03',
+            'AEI.01.01', 'AEI.02.01', 'AEI.03.01',
+        }
+
+        self.assertTrue(visible_codes)
+        self.assertTrue(visible_codes <= display_codes)
+        for original in ('OEI.04', 'OEI.10', 'AEI.01.05', 'AEI.04.02', 'AEI.10.01'):
+            self.assertNotIn(original, full_text)
+        for display in display_codes:
+            self.assertIn(display, full_text)
+
+        tables = root.findall(f'.//{{{WORD_NS}}}tbl')
+        for table in tables:
+            table_codes = set(re.findall(
+                r'(?<![A-Za-z0-9_.-])(OEI\.\d{2}|AEI\.\d{2}\.\d{2})(?![A-Za-z0-9_.-])',
+                _xml_text(table),
+            ))
+            self.assertTrue(table_codes <= display_codes)
+
+        self.assertEqual(data['selecciones']['oei'], [
+            'oei-OEI.01', 'oei-OEI.04', 'oei-OEI.10'
+        ])
+        self.assertEqual(data['prioridades']['oei'], ['OEI.01', 'OEI.04', 'OEI.10'])
+        self.assertEqual(data['prioridades']['aei']['OEI.01'], ['AEI.01.05'])
+        self.assertEqual(data['selecciones']['aei'][0], 'aei-AEI.01.05')
+        self.assertIn(('AEI.01.05', 0), indexar_metas(data['metas']))
+        self.assertIn(('AEI.04.02', 0), indexar_metas(data['metas']))
 
     def test_two_objectives_keep_priority_order_across_route_matrix_and_fichas(self):
         root = _generate_document_xml(_ordered_generation_payload())
@@ -751,9 +1180,9 @@ class FreshDocxGenerationTests(unittest.TestCase):
                     for index in (0, 1, 4, 5)
                 ])
         self.assertEqual(route_rows, [
-            ['1', 'OEI.02', '1', 'AEI.02.01'],
-            ['2', 'OEI.01', '1', 'AEI.01.02'],
-            ['2', 'OEI.01', '2', 'AEI.01.01'],
+            ['1', 'OEI.01', '1', 'AEI.01.01'],
+            ['2', 'OEI.02', '1', 'AEI.02.01'],
+            ['2', 'OEI.02', '2', 'AEI.02.02'],
         ])
 
         matrix = next(
@@ -767,7 +1196,7 @@ class FreshDocxGenerationTests(unittest.TestCase):
             and re.fullmatch(r'(?:OEI\.\d{2}|AEI\.\d{2}\.\d{2})', _xml_text(_table_cells(row)[0]).strip())
         ]
         self.assertEqual(matrix_codes, [
-            'OEI.01', 'AEI.01.01', 'AEI.01.02', 'OEI.02', 'AEI.02.01'
+            'OEI.02', 'AEI.02.02', 'AEI.02.01', 'OEI.01', 'AEI.01.01'
         ])
 
         ficha_tables = [
@@ -782,7 +1211,7 @@ class FreshDocxGenerationTests(unittest.TestCase):
             for table in ficha_tables
         ]
         self.assertEqual(ficha_codes, [
-            'OEI.02', 'AEI.02.01', 'OEI.01', 'AEI.01.02', 'AEI.01.01'
+            'OEI.01', 'AEI.01.01', 'OEI.02', 'AEI.02.01', 'AEI.02.02'
         ])
 
         for code in ('OEI.03', 'OEI.04', 'OEI.05', 'OEI.06', 'OEI.07', 'OEI.08', 'OEI.09', 'OEI.10', 'OEI.11'):
@@ -847,7 +1276,7 @@ class FreshDocxGenerationTests(unittest.TestCase):
         rows = [
             row for row in _table_rows(matrix)
             if _table_cells(row)
-            and _xml_text(_table_cells(row)[0]).strip() == 'AEI.02.01'
+            and _xml_text(_table_cells(row)[0]).strip() == 'AEI.01.01'
         ]
         self.assertEqual(len(rows), 1)
         cells = _table_cells(rows[0])

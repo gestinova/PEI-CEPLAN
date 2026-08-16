@@ -371,7 +371,9 @@ function filtrarMetas(metas, anios, indicadoresSeleccionados) {
   Object.entries(metas).forEach(([id, value]) => {
     if (!indicadoresSeleccionados.has(id) || !value || typeof value !== 'object' || Array.isArray(value)) return;
     clean[id] = Object.fromEntries(
-      Object.entries(value).filter(([field]) => allowedFields.has(field))
+      Object.entries(value)
+        .filter(([field]) => allowedFields.has(field))
+        .map(([field, fieldValue]) => [field, normalizarValorMeta(field, fieldValue)])
     );
   });
   return clean;
@@ -982,15 +984,39 @@ function obtenerAnios() {
   return extraerAniosPeriodo(obtenerPeriodoPei());
 }
 
+function esCampoValorMeta(campo) {
+  return campo === 'valor_base' || /^meta_\d{4}$/.test(campo);
+}
+
+function normalizarValorMeta(campo, valor) {
+  if (valor === null || valor === undefined) return '';
+  if (typeof valor === 'string' && valor.trim() === '') return '';
+
+  const numero = typeof valor === 'number' ? valor : Number(String(valor).trim());
+  if (!Number.isFinite(numero)) return '';
+  return esCampoValorMeta(campo) ? Math.max(0, numero) : numero;
+}
+
+function normalizarMetaInput(input) {
+  if (!input) return;
+  const match = input.id.match(/^(.*)-(meta_\d{4}|año_base|valor_base)$/);
+  if (!match) return;
+  const normalizado = guardarMeta(match[1], match[2], input.value);
+  input.value = normalizado === '' ? '' : String(normalizado);
+}
+
 function crearFormularioMeta(ind) {
   const saved = appState.metas[ind.id] || {};
+  Object.keys(saved).forEach(campo => {
+    saved[campo] = normalizarValorMeta(campo, saved[campo]);
+  });
   const anios = obtenerAnios();
   const aniosHtml = anios.map(a => `
     <div class="meta-field">
       <label>Meta ${a} *</label>
       <input type="number" id="${ind.id}-meta_${a}" class="meta-input"
              placeholder="0" min="0" step="0.01" value="${saved['meta_'+a] ?? ''}"
-             oninput="guardarMeta('${ind.id}','meta_${a}',this.value)">
+             oninput="normalizarMetaInput(this)">
     </div>`).join('');
   return `<div class="meta-card">
     <div class="meta-header">
@@ -1005,13 +1031,13 @@ function crearFormularioMeta(ind) {
         <label>Año Base *</label>
         <input type="number" id="${ind.id}-año_base" class="meta-input" placeholder="2025"
                min="2020" max="2030" value="${saved.año_base ?? ''}"
-               oninput="guardarMeta('${ind.id}','año_base',this.value)">
+               oninput="normalizarMetaInput(this)">
       </div>
       <div class="meta-field">
         <label>Valor Base *</label>
         <input type="number" id="${ind.id}-valor_base" class="meta-input" placeholder="0"
                min="0" step="0.01" value="${saved.valor_base ?? ''}"
-               oninput="guardarMeta('${ind.id}','valor_base',this.value)">
+               oninput="normalizarMetaInput(this)">
       </div>
     </div>
     <div class="meta-años-grid">${aniosHtml}</div>
@@ -1020,7 +1046,9 @@ function crearFormularioMeta(ind) {
 
 function guardarMeta(id, campo, valor) {
   if (!appState.metas[id]) appState.metas[id] = {};
-  appState.metas[id][campo] = valor !== '' ? parseFloat(valor) : '';
+  const normalizado = normalizarValorMeta(campo, valor);
+  appState.metas[id][campo] = normalizado;
+  return normalizado;
 }
 
 // ============================================

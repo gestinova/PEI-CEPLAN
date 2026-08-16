@@ -143,6 +143,38 @@ class EndpointTests(unittest.TestCase):
         self.assertTrue(body['success'])
         self.assertEqual(body['file'], 'PEI_Test.docx')
 
+    def test_generate_rejects_negative_meta_before_docx(self):
+        payload = {
+            'periodo_pei': '2027-2032',
+            'ordenanza_pdc': '002-2024-MDL',
+            'selecciones': {
+                'oei': ['oei-OEI.01'],
+                'aei': ['aei-AEI.01.01'],
+                'indicadoresOEI': ['ind-oei-OEI.01-0'],
+                'indicadoresAEI': ['ind-aei-AEI.01.01-0'],
+            },
+            'prioridades': {
+                'oei': ['OEI.01'],
+                'aei': {'OEI.01': ['AEI.01.01']},
+            },
+            'metas': {
+                'ind-oei-OEI.01-0': {'valor_base': -1},
+            },
+        }
+        with patch.object(PEIHandler, 'generar_documento') as generate:
+            status, body = self.request(
+                '/generar',
+                method='POST',
+                body=json.dumps(payload),
+                headers={'Content-Type': 'application/json'},
+            )
+
+        self.assertEqual(status, 422)
+        self.assertFalse(body['success'])
+        self.assertIsInstance(body['details'], list)
+        self.assertIn('negative_value', {error['code'] for error in body['details']})
+        generate.assert_not_called()
+
     def test_generate_rejects_unsupported_content_type(self):
         with patch.object(PEIHandler, 'generar_documento') as generate:
             status, body = self.request(
