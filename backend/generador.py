@@ -16,6 +16,17 @@ EXCEL_PATH = PROJECT_ROOT / 'IT_PEI.xlsx'
 # Almacén global en memoria para las Unidades Ejecutoras
 DATOS_UES = {}
 
+# --- NUEVO: Cargar variables desde .env.local (Solo para uso local) ---
+env_path = PROJECT_ROOT / '.env.local'
+if env_path.exists():
+    with open(env_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            # Ignorar líneas vacías o comentarios
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ[key.strip()] = value.strip()
+
 def cargar_catalogo_ues():
     """Carga el catálogo de Unidades Ejecutoras desde AMBAS hojas del archivo Excel IT_PEI.xlsx."""
     global DATOS_UES
@@ -435,11 +446,23 @@ class PEIHandler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     cargar_catalogo_ues()
-    httpd = HTTPServer(('', 8000), partial(PEIHandler, directory=str(PROJECT_ROOT)))
+    
+    # --- NUEVO: Configuración de Puerto para Render y Local ---
+    # Render asigna automáticamente una variable de entorno llamada PORT.
+    # Si no la encuentra (por ejemplo, en tu computadora local), usa el 8000.
+    puerto = int(os.environ.get('PORT', 8000))
+    
+    # Para que Render pueda exponer tu aplicación a Internet, 
+    # el host debe ser obligatoriamente '0.0.0.0' en lugar de '' o 'localhost'.
+    host = '0.0.0.0'
+    
+    httpd = HTTPServer((host, puerto), partial(PEIHandler, directory=str(PROJECT_ROOT)))
+    
     print("\n" + "="*70)
-    print("  GENERADOR PEI - CON AUTOCOMPLETADO Y DESCARGA EN MEMORIA")
-    print("  http://localhost:8000")
+    print(f"  GENERADOR PEI - SERVIDOR ACTIVO")
+    print(f"  Escuchando en http://{host}:{puerto}")
     print("="*70 + "\n")
+    
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
