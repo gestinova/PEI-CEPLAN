@@ -1,4 +1,5 @@
 docx-mailmerge
 python-docx
 pandas
+openpyxl
 gunicorn==21.2.0
