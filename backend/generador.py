@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
+# Tus importaciones actuales al inicio de generador.py
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from functools import partial
 import json, os, sys, re, io, urllib.parse, subprocess, importlib.util
@@ -9,6 +7,14 @@ from urllib.parse import urlparse
 import pandas as pd
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+
+# --- AÑADE ESTAS LÍNEAS AQUÍ ARRIBA ---
+from mailmerge import MailMerge
+from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_BREAK
+from copy import deepcopy
+# -------------------------------------
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / 'frontend'
@@ -88,19 +94,6 @@ def resolver_ruta(*parts):
     return candidates[0]
 
 
-def cargar_mailmerge():
-    """Carga explícitamente el `MailMerge` de `docx-mailmerge` sin depender del paquete `mailmerge` CLI."""
-    module_path = Path(sys.prefix) / 'Lib' / 'site-packages' / 'mailmerge.py'
-    if not module_path.exists():
-        raise FileNotFoundError(f'No se encontró el módulo de docx-mailmerge en: {module_path}')
-
-    spec = importlib.util.spec_from_file_location('docx_mailmerge_module', module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    if not hasattr(module, 'MailMerge'):
-        raise AttributeError('El módulo cargado no expone la clase MailMerge esperada.')
-    return module.MailMerge
-
 
 class PEIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory=None, **kwargs):
@@ -171,31 +164,16 @@ class PEIHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-    def generar_documento(self, data):
+def generar_documento(self, data):
         print("\n" + "="*70)
         print("GENERANDO DOCUMENTO PEI EN MEMORIA")
         print("="*70)
-
-        try:
-            MailMerge = cargar_mailmerge()
-            from docx import Document
-            from docx.shared import Pt
-            from docx.enum.text import WD_BREAK
-            from copy import deepcopy
-        except Exception:
-            print("Instalando dependencias requeridas...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install",
-                "docx-mailmerge", "python-docx", "pandas", "openpyxl", "--break-system-packages", "--quiet"])
-            MailMerge = cargar_mailmerge()
-            from docx import Document
-            from docx.shared import Pt
-            from docx.enum.text import WD_BREAK
-            from copy import deepcopy
 
         campos = ['codigo_ue', 'nombre_municipio', 'periodo_pei', 'nombre_provincia',
                   'nombre_region', 'nombre_alcalde', 'resolucion_alcaldia',
                   'plan_desarrollo_concertado', 'ordenanza_pdc', 'mision_institucional',
                   'politica_general_gobierno', 'decreto_politica_general_gobierno']
+        
         d = {k: str(data.get(k, '')).strip() for k in campos}
         print(f"Municipio: {d['nombre_municipio']}")
 
