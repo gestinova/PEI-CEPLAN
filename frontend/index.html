@@ -1,11 +1,834 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=/frontend/index_fase4.html">
-  <title>PEI CEPLAN</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CEPLAN | Generador del Plan Estratégico Institucional (PEI)</title>
+  
+  <!-- Enlace al archivo CSS externo -->
+  <link rel="stylesheet" href="styles_fase4.css">
 </head>
 <body>
-  <p>Redirigiendo al generador PEI...</p>
+
+  <!-- FRANJA DE IDENTIDAD GOBIERNO DEL PERÚ -->
+  <div class="top-gov-bar">
+    <div class="gov-brand">
+      <div class="gov-flag"></div>
+      <span>PERÚ | Centro Nacional de Planeamiento Estratégico - CEPLAN</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- ENCABEZADO OFICIAL -->
+    <div class="header">
+      <h1>Generador del Plan Estratégico Institucional (PEI)</h1>
+    </div>
+
+    <!-- PASOS DE PROGRESO -->
+    <div class="progress-steps">
+      <div class="step active" data-step="1"><div class="step-number">1</div><div class="step-label">Datos Generales</div></div>
+      <div class="step" data-step="2"><div class="step-number">2</div><div class="step-label">OEI / AEI</div></div>
+      <div class="step" data-step="3"><div class="step-number">3</div><div class="step-label">Metas Físicas</div></div>
+      <div class="step" data-step="4"><div class="step-number">4</div><div class="step-label">Generar PEI</div></div>
+    </div>
+
+    <div class="form-container">
+      <!-- PASO 1 -->
+      <div class="form-step active" data-step="1">
+        <div class="section">
+          <h2 class="section-title">Datos Generales del Pliego / Unidad Ejecutora</h2>
+          <div class="two-column">
+            <div class="form-group">
+              <label>Código UE *</label>
+              <input type="text" id="codigo_ue" placeholder="Ej: 300682">
+              <div class="hint">💡 Ingresa el código y presiona <strong>ENTER</strong> para autocompletar los datos de la entidad.</div>
+            </div>
+            <div class="form-group"><label>Período PEI *</label><input type="text" id="periodo_pei" placeholder="Ej: 2026-2030"></div>
+          </div>
+          <div class="form-group"><label>Nombre del Municipio / Pliego *</label><input type="text" id="nombre_municipio" placeholder="Ej: Municipalidad Distrital de Ventanilla"></div>
+          <div class="two-column">
+            <div class="form-group"><label>Provincia *</label><input type="text" id="nombre_provincia" placeholder="Ej: Prov. Callao"></div>
+            <div class="form-group"><label>Región / Departamento *</label><input type="text" id="nombre_region" placeholder="Ej: Callao"></div>
+          </div>
+          <div class="form-group"><label>Titular de la Entidad (Alcalde / Responsable) *</label><input type="text" id="nombre_alcalde" placeholder="Ej: Juan Pérez García"></div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Marco Normativo y Documentos de Gestión</h2>
+          <div class="form-group"><label>Resolución de Aprobación</label><input type="text" id="resolucion_alcaldia" placeholder="Ej: Resolución de Alcaldía N° 001-2024-MDV"></div>
+          <div class="form-group"><label>Plan de Desarrollo Concertado (PDC)</label><input type="text" id="plan_desarrollo_concertado" placeholder="Ej: Plan de Desarrollo Concertado al 2030"></div>
+          <div class="form-group"><label>Ordenanza del PDC</label><input type="text" id="ordenanza_pdc" placeholder="Ej: Ordenanza Municipal N° 012-2023-MDV"></div>
+          <div class="form-group"><label>Política General de Gobierno</label><input type="text" id="politica_general_gobierno" placeholder="Ej: Política General de Gobierno al 2026"></div>
+          <div class="form-group"><label>Decreto Supremo de PGG</label><input type="text" id="decreto_politica_general_gobierno" placeholder="Ej: Decreto Supremo N° 042-2023-PCM"></div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Misión Institucional</h2>
+          <div class="form-group"><label>Declaración de la Misión Institucional *</label><textarea id="mision_institucional" placeholder="Escriba la misión institucional aprobada..."></textarea></div>
+        </div>
+
+        <div class="btn-container">
+          <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">Restablecer Formulario</button>
+          <button type="button" class="btn btn-primary" onclick="irPaso1a2()">Siguiente: Seleccionar OEI/AEI →</button>
+        </div>
+      </div>
+
+      <!-- PASO 2 -->
+      <div class="form-step" data-step="2">
+        <div class="section">
+          <h2 class="section-title">Selección y Priorización de Objetivos (OEI) y Acciones (AEI)</h2>
+          <div class="help-text">
+            <strong>Instrucciones:</strong><br>
+            1. En el panel izquierdo marque los Objetivos Estratégicos Institucionales (OEI) e indicadores aplicables.<br>
+            2. En el panel derecho arrastre los bloques para definir el orden de prioridad institucional.
+          </div>
+          <div class="selection-alert" id="selectionAlert">Debe seleccionar al menos 1 OEI con sus respectivos indicadores y AEI antes de continuar.</div>
+          <div class="selection-layout">
+            <div class="selection-panel">
+              <div class="panel-title"><span>Catálogo Estándar CEPLAN</span></div>
+              <div class="panel-subtitle">Seleccione los OEI, indicadores y AEI articulados</div>
+              <div id="oeiContainer" class="oei-grid"><div class="empty-state">Cargando catálogo...</div></div>
+            </div>
+            <div class="selection-panel">
+              <div class="panel-title">
+                <span>Orden de Prioridad</span>
+                <span class="counter-badge" id="priorityCount">0</span>
+              </div>
+              <div class="panel-subtitle">Arrastre verticalmente para cambiar la jerarquía</div>
+              <div id="priorityContainer" class="priority-list">
+                <div class="empty-state">Los OEI seleccionados aparecerán aquí para su priorización.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="btn-container">
+          <button type="button" class="btn btn-secondary" onclick="irPaso(1)">← Volver a Datos Generales</button>
+          <button type="button" class="btn btn-primary" onclick="validarYContinuarAMetas()">Siguiente: Definir Metas →</button>
+        </div>
+      </div>
+
+      <!-- PASO 3 -->
+      <div class="form-step" data-step="3">
+        <div class="section">
+          <h2 class="section-title">Programación de Logros Esperados y Metas Anuales</h2>
+          <div class="help-text">
+            <strong>Instrucciones:</strong> Registre el año base, valor base y los valores objetivo para cada año del período PEI.
+          </div>
+          <div class="selection-alert" id="metasAlert">⚠️ Por favor, complete todos los campos de metas requeridos.</div>
+          <div id="metasContainer" class="metas-container"></div>
+        </div>
+        <div class="btn-container">
+          <button type="button" class="btn btn-secondary" onclick="irPaso(2)">← Volver a Selección de OEI/AEI</button>
+          <button type="button" class="btn btn-primary" onclick="validarMetasYContinuar()">Siguiente: Generar Documento →</button>
+        </div>
+      </div>
+
+      <!-- PASO 4 -->
+      <div class="form-step" data-step="4">
+        <div class="section">
+          <h2 class="section-title">Generación del Documento PEI</h2>
+          <div class="help-text">
+            <strong>Resumen del Instrumento de Gestión:</strong><br>
+            • <span id="resumenOEI">0 OEI seleccionados</span><br>
+            • <span id="resumenAEI">0 AEI seleccionadas</span><br>
+            • <span id="resumenIndicadores">0 indicadores totales</span><br>
+            • <span id="resumenMetas">0 indicadores con metas programadas</span>
+          </div>
+          <div id="instruccionesServidor" style="margin-top:15px;padding:12px;background:#eef7f0;border-left:4px solid var(--success-green);font-size:13px;color:#14532d;line-height:1.6">
+            <strong>Servicio de Asistencia Técnica Conectado</strong><br>
+            Al hacer clic en "Generar Documento PEI", el sistema procesará la matriz y descargará automáticamente el documento oficial en formato Microsoft Word (.docx). No se almacenarán copias residuales en el servidor.
+          </div>
+        </div>
+        <div class="btn-container">
+          <button type="button" class="btn btn-secondary" onclick="irPaso(3)">← Volver a Metas</button>
+          <button type="button" class="btn btn-primary" id="btnGenerar" onclick="generarDocumento()">✨ Generar Documento PEI (.docx)</button>
+        </div>
+        <div id="message" class="message"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+
+// ============================================
+// MATRIZ ESTÁNDAR CEPLAN
+// ============================================
+const MATRIZ_ESTANDAR = {"oei":[{"codigo":"OEI.01","denominacion":"Promover el ordenamiento territorial en beneficio de población local","indicadores":[{"nombre":"Porcentaje de la población local que reside en zonas que cumplen con los instrumentos técnicos sustentatorios para el ordenamiento territorial","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.01.01","denominacion":"Instrumentos de planificación territorial implementados en beneficio de la población local","indicadores":[{"nombre":"Número de instrumentos de planificación territorial implementados en la localidad","unidad":"Número"}]},{"codigo":"AEI.01.02","denominacion":"Saneamiento físico-legal efectivo para la población en situación de informalidad o sin título de propiedad en la localidad","indicadores":[{"nombre":"Porcentaje de predios de la localidad con saneamiento físico - legal","unidad":"Porcentaje"}]},{"codigo":"AEI.01.03","denominacion":"Espacios públicos en condiciones operativas adecuadas en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de espacios públicos en condiciones adecuadas","unidad":"Porcentaje"}]},{"codigo":"AEI.01.04","denominacion":"Catastro actualizado en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de unidades catastrales actualizadas","unidad":"Porcentaje"}]},{"codigo":"AEI.01.05","denominacion":"Fiscalización de habilitaciones urbanas y edificaciones de manera integral, dirigidos a personas naturales y jurídicas que ejecutan obras en la localidad","indicadores":[{"nombre":"Número de fiscalizaciones en habilitaciones urbanas y edificaciones realizadas de manera efectiva","unidad":"Número"}]}]},{"codigo":"OEI.02","denominacion":"Fortalecer el acceso a la atención primaria de salud preventiva de la población local","indicadores":[{"nombre":"Porcentaje de personas satisfechas con las campañas y actividades de promoción de salud realizadas por la municipalidad","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.02.01","denominacion":"Construcción; equipamiento y mantenimiento de los establecimientos de salud adecuados en beneficio de la salud de la población local","indicadores":[{"nombre":"Porcentaje de establecimientos médicos bajo responsabilidad municipal en condiciones operativas y de infraestructura adecuadas","unidad":"Porcentaje"},{"nombre":"Porcentaje de inversiones en infraestructura culminadas para la mejora/construcción de establecimientos de salud bajo administración municipal","unidad":"Porcentaje"}]},{"codigo":"AEI.02.02","denominacion":"Campañas de medicina preventiva, primeros auxilios, educación sanitaria y profilaxis ejecutadas en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de campañas médicas municipales ejecutadas en la localidad","unidad":"Porcentaje"}]},{"codigo":"AEI.02.03","denominacion":"Campañas de control de epidemias y sanidad animal ejecutadas dirigidas a productores pecuarios, comunidades rurales o ámbitos urbanos de la localidad","indicadores":[{"nombre":"Porcentaje de campañas municipales de control de epidemias y sanidad animal ejecutadas","unidad":"Porcentaje"}]}]},{"codigo":"OEI.03","denominacion":"Promover el acceso a servicios educativos, deportivos y recreacionales con enfoque intercultural e inclusivo para la población local","indicadores":[{"nombre":"Porcentaje de participantes satisfechos con los programas educativos organizados por la municipalidad","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.03.01","denominacion":"Talleres de la lectura, escritura, ciencias y arte implementados en espacios educativos y culturales en beneficio de la población local","indicadores":[{"nombre":"Número de actividades culturales bajo responsabilidad municipal ejecutadas","unidad":"Número"}]},{"codigo":"AEI.03.02","denominacion":"Programa deportivo y recreacional municipal accesible para la niñez, juventud y vecindario en general de la localidad","indicadores":[{"nombre":"Porcentaje de sesiones del programa deportivo municipal realizadas","unidad":"Porcentaje"}]},{"codigo":"AEI.03.03","denominacion":"Construcción, equipamiento y mantenimiento de los locales educativos, adecuados en beneficio de la población estudiantil de la localidad","indicadores":[{"nombre":"Porcentaje de inversiones en infraestructura culminadas para la mejora/construcción de establecimientos educativos","unidad":"Porcentaje"}]}]},{"codigo":"OEI.04","denominacion":"Promover condiciones ambientales saludables y sostenibles para la población local","indicadores":[{"nombre":"Porcentaje de ciudadanos satisfechos con el servicio de recojo de residuos sólidos","unidad":"Porcentaje"},{"nombre":"Porcentaje de zonas de la localidad donde se han reducido puntos críticos de contaminación","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.04.01","denominacion":"Acciones de conservación de recursos forestales y de fauna silvestre ejecutadas, dirigidas a comunidades, productores u organizaciones locales","indicadores":[{"nombre":"Número de acciones de conservación ambiental ejecutadas por la municipalidad","unidad":"Número"}]},{"codigo":"AEI.04.02","denominacion":"Gestión de los residuos sólidos de manera integral en beneficio de la población local","indicadores":[{"nombre":"Promedio de días por semana del servicio de recojo de residuos sólidos","unidad":"Promedio"},{"nombre":"Porcentaje de toneladas de residuos sólidos no reutilizables dispuestos adecuadamente en infraestructuras de residuos sólidos","unidad":"Porcentaje"},{"nombre":"Número de toneladas de residuos sólidos no reutilizables dispuestos oportunamente en una zona de disposición final.","unidad":"Número"},{"nombre":"Número de toneladas anuales de residuos sólidos inorgánicos recuperados segregados en la fuente.","unidad":"Número"},{"nombre":"Número de toneladas anuales de residuos sólidos orgánicos recuperados segregados en la fuente.","unidad":"Número"}]},{"codigo":"AEI.04.03","denominacion":"Programa Municipal de Educación, Cultura y Ciudadanía Ambiental EDUCCA implementado en beneficio de la población local","indicadores":[{"nombre":"Número de actividades realizadas para la promoción de la conciencia ambiental del programa EDUCCA","unidad":"Número"}]},{"codigo":"AEI.04.04","denominacion":"Fiscalización de emisión de humos, gases, ruido y otros contaminantes de la atmósfera y el ambiente, de manera oportuna a personas naturales y jurídicas que desarrollan actividades generadoras de emisiones contaminantes en la localidad","indicadores":[{"nombre":"Número de fiscalizaciones ambientales en la localidad","unidad":"Número"}]},{"codigo":"AEI.04.05","denominacion":"Áreas verdes de uso público en condiciones adecuadas para el disfrute de la población local","indicadores":[{"nombre":"Porcentaje de áreas verdes en espacios públicos municipales en condiciones adecuadas","unidad":"Porcentaje"}]},{"codigo":"AEI.04.06","denominacion":"Zonificación Ecológica Económica (ZEE) implementada en beneficio de los tomadores de decisiones y la ciudadanía","indicadores":[{"nombre":"Porcentaje de zonas productivas con uso adecuado de acuerdo a la Zonificación Ecológica Económica","unidad":"Porcentaje"}]},{"codigo":"AEI.04.07","denominacion":"Acciones municipales para la protección y conservación sostenible de fuentes de agua en beneficio de la población local","indicadores":[{"nombre":"Número de acciones municipales para la protección de fuentes de agua en la localidad","unidad":"Número"}]}]},{"codigo":"OEI.05","denominacion":"Reducir la exposición al riesgo de desastres de origen natural o antrópico de la población local","indicadores":[{"nombre":"Porcentaje de zonas de la localidad con factores de riesgo de desastres eliminados o minimizados","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.05.01","denominacion":"Instrumentos de estimación del riesgo de desastres implementados para la protección de la población y el territorio local","indicadores":[{"nombre":"Número de instrumentos para la estimación del riesgo de desastres implementados en la localidad","unidad":"Número"}]},{"codigo":"AEI.05.02","denominacion":"Asistencia técnica en gestión de riesgos de desastres permanentes para la población local","indicadores":[{"nombre":"Número de asistencias técnicas en GRD realizadas en zonas vulnerables en la localidad","unidad":"Número"}]},{"codigo":"AEI.05.03","denominacion":"Sistema de alerta temprana implementado en beneficio de la población local","indicadores":[{"nombre":"Número de mecanismos de vigilancia operativos para la comunicación de alertas tempranas en la localidad","unidad":"Número"}]},{"codigo":"AEI.05.04","denominacion":"Información de emergencias, peligros y desastres oportuna para los tomadores de decisiones del sistema.","indicadores":[{"nombre":"Número de herramientas de comunicación efectivamente entregadas a los tomadores de decisiones y ciudadanía sobre peligros, emergencias y desastres","unidad":"Número"}]},{"codigo":"AEI.05.05","denominacion":"Atención frente a emergencias y desastres oportuna a la población damnificada y afectada en la localidad","indicadores":[{"nombre":"Número de atenciones integrales a damnificados de emergencias y desastres","unidad":"Número"}]},{"codigo":"AEI.05.06","denominacion":"Rehabilitación de servicios públicos básicos, infraestructura y medios de vida oportunos en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de servicios públicos municipales interrumpidos por emergencias y desastres restaurados de manera oportuna","unidad":"Porcentaje"}]},{"codigo":"AEI.05.07","denominacion":"Reconstrucción física, económica y social con enfoque de derechos humanos en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de inversiones municipales en infraestructura culminadas para la reconstrucción en la localidad","unidad":"Porcentaje"}]},{"codigo":"AEI.05.08","denominacion":"Infraestructura para la prevención y mitigación de riesgos de desastres adecuada en la localidad.","indicadores":[{"nombre":"Porcentaje de PIPs de GRD del banco de proyectos de la municipalidad","unidad":"Porcentaje"}]}]},{"codigo":"OEI.06","denominacion":"Mejorar el acceso a servicios de protección social y defensa de derechos de la población en situación de vulnerabilidad de la localidad","indicadores":[{"nombre":"Porcentaje de la población en situación de vulnerabilidad atendida por programas sociales municipales","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.06.01","denominacion":"Servicios de registro civil oportunos para la población local","indicadores":[{"nombre":"Porcentaje de atenciones de registro civil oportunas en la localidad","unidad":"Porcentaje"}]},{"codigo":"AEI.06.02","denominacion":"Programas de apoyo social ejecutados en beneficio de la población en situación de vulnerabilidad en la localidad","indicadores":[{"nombre":"Número de atenciones en los programas municipales de apoyo social en la localidad","unidad":"Número"}]},{"codigo":"AEI.06.03","denominacion":"Registro para la atención de programas de reparaciones, de forma oportuna para las víctimas y familiares de violencia en la localidad","indicadores":[{"nombre":"Número de registros efectivos para la atención de programas de reparaciones para las víctimas y familiares de violencia en la localidad","unidad":"Número"}]},{"codigo":"AEI.06.04","denominacion":"Servicio de defensa y promoción de derechos de manera permanente en beneficio de la población en situación de vulnerabilidad de la localidad","indicadores":[{"nombre":"Número de casos atendidos por el servicio social municipal para la defensa y promoción de derechos","unidad":"Número"}]},{"codigo":"AEI.06.05","denominacion":"Empadronamiento socioeconómico oportuno de hogares en situación de pobreza o vulnerabilidad en la localidad","indicadores":[{"nombre":"Número de registros actualizados en el Sistema de Focalización de Hogares (SISFOH)","unidad":"Número"}]}]},{"codigo":"OEI.07","denominacion":"Fortalecer la prevención y disuasión del delito y violencia en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de zonas con alta incidencia delictiva con servicio de patrullaje integrado","unidad":"Porcentaje"},{"nombre":"Tasa de denuncias por comisión de delitos por 10 000 habitantes","unidad":"Tasa"}],"aei":[{"codigo":"AEI.07.01","denominacion":"Seguridad ciudadana comunitaria operativa para la protección de la población local","indicadores":[{"nombre":"Porcentaje de rondas ciudadanas de seguridad con equipamiento adecuado","unidad":"Porcentaje"}]},{"codigo":"AEI.07.02","denominacion":"Patrullaje municipal efectivo en beneficio de la población local","indicadores":[{"nombre":"Promedio semanal de jornadas de patrullaje integrado por zona en la localidad","unidad":"Promedio"}]},{"codigo":"AEI.07.03","denominacion":"Sistema de videovigilancia operativo para la protección y seguridad de la población local","indicadores":[{"nombre":"Porcentaje de cámaras de videovigilancia operativas en la localidad","unidad":"Porcentaje"}]}]},{"codigo":"OEI.08","denominacion":"Garantizar la provisión de los servicios de agua potable y saneamiento en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de viviendas con servicio de agua potable y alcantarillado","unidad":"Porcentaje"},{"nombre":"Porcentaje de viviendas en zona urbana con servicio de agua potable y/o alcantarillado","unidad":"Porcentaje"},{"nombre":"Porcentaje de viviendas en zona rural con servicio de agua potable y/o alcantarillado","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.08.01","denominacion":"Asistencia técnica en sostenibilidad de los servicios de agua potable y saneamiento de manera continua a la(s) Junta(s) Administradoras de Servicios de Saneamiento de la localidad","indicadores":[{"nombre":"Número de asistencias técnicas a las Juntas Administradoras de Servicios de Saneamiento (JASS)","unidad":"Número"}]},{"codigo":"AEI.08.02","denominacion":"Servicio de agua potable de calidad para la población local","indicadores":[{"nombre":"Promedio diario de horas de servicio de agua potable en la localidad","unidad":"Promedio"},{"nombre":"Porcentaje de conexiones de agua que cumplen con presencia de cloro residual libre mayor o igual a 0.5 mg/L","unidad":"Porcentaje"},{"nombre":"Número de conexiones nuevas de agua potable instaladas en la localidad","unidad":"Número"}]},{"codigo":"AEI.08.03","denominacion":"Servicio de alcantarillado sanitario y tratamiento de aguas residuales eficiente para la población local","indicadores":[{"nombre":"Porcentaje de estaciones de bombeo en condiciones operativas adecuadas","unidad":"Porcentaje"},{"nombre":"Número de mantenimientos realizados a las conexiones domiciliarias de alcantarillado","unidad":"Número"},{"nombre":"Número de conexiones nuevas de alcantarillado instaladas en la localidad","unidad":"Número"}]}]},{"codigo":"OEI.09","denominacion":"Impulsar el crecimiento de la actividad empresarial, de emprendimientos y MYPES en la localidad","indicadores":[{"nombre":"Porcentaje de micro y pequeñas empresas que operan con licencias municipales adecuadas","unidad":"Porcentaje"},{"nombre":"Número de establecimientos comerciales que operan con licencias municipales adecuadas","unidad":"Número"}],"aei":[{"codigo":"AEI.09.01","denominacion":"Fiscalización y control del cumplimiento normativo permanente a los agentes económicos de la localidad","indicadores":[{"nombre":"Número de fiscalizaciones de licencias de funcionamiento realizadas de manera efectiva a micro y pequeñas empresas","unidad":"Número"}]},{"codigo":"AEI.09.02","denominacion":"Eventos turísticos vinculados al patrimonio cultural y natural con enfoque sostenible, dirigidos a emprendedores, asociaciones y otros actores del turismo y la cultura de la localidad","indicadores":[{"nombre":"Número de eventos de promoción turística realizados por la municipalidad","unidad":"Número"}]},{"codigo":"AEI.09.03","denominacion":"Asistencia técnica en actividades económicas locales especializada dirigida a los agentes económicos de la localidad","indicadores":[{"nombre":"Número de asistencias técnicas para el fortalecimiento empresarial a micro y pequeños empresarios de la localidad","unidad":"Número"}]},{"codigo":"AEI.09.04","denominacion":"Campañas de promoción de la formalización de micro y pequeñas empresas accesibles para la población local","indicadores":[{"nombre":"Número de campañas implementadas para la formalización de micro y pequeñas empresas","unidad":"Número"}]},{"codigo":"AEI.09.05","denominacion":"Eventos de articulación comercial y consumo de productos locales organizados con enfoque sostenible para agentes comerciales en la localidad","indicadores":[{"nombre":"Número de eventos para la promoción de la comercialización y consumo de productos locales organizados por la municipalidad","unidad":"Número"}]},{"codigo":"AEI.09.06","denominacion":"Construcción, equipamiento y mantenimiento de infraestructura productiva adecuada y disponible para los productores agropecuarios y pequeños empresarios locales","indicadores":[{"nombre":"Número de infraestructuras productivas construidas para productores agropecuarios y pequeños empresarios.","unidad":"Número"},{"nombre":"Número de equipos para las infraestructuras productivas efectivamente entregadas","unidad":"Número"},{"nombre":"Número de servicios de mantenimiento realizados a la infraestructura productiva efectivamente realizados","unidad":"Número"}]}]},{"codigo":"OEI.10","denominacion":"Mejorar el servicio de transporte y transitabilidad en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de puntos críticos de tránsito en vías locales atendidos y mitigados","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.10.01","denominacion":"Sistema de señalización de tránsito con mantenimiento adecuado en beneficio de la población de la localidad","indicadores":[{"nombre":"Porcentaje de vías locales con señalización adecuada","unidad":"Porcentaje"}]},{"codigo":"AEI.10.02","denominacion":"Capacitación en materia de educación vial oportuna dirigida a la población local","indicadores":[{"nombre":"Número de eventos educativos realizados para la promoción de la educación vial","unidad":"Número"}]},{"codigo":"AEI.10.03","denominacion":"Mantenimiento permanente de la infraestructura vial urbano o rural en beneficio de la población local","indicadores":[{"nombre":"Porcentaje de caminos vecinales en condiciones de transitabilidad","unidad":"Porcentaje"},{"nombre":"Porcentaje de km de la red vial urbana en buen estado","unidad":"Porcentaje"},{"nombre":"Porcentaje de km de la red vial rural en buen estado","unidad":"Porcentaje"}]},{"codigo":"AEI.10.04","denominacion":"Supervisión y control del transporte público con eficiencia y cumplimiento normativo a los operadores de transporte local","indicadores":[{"nombre":"Número de fiscalizaciones a empresas prestadoras del servicio de transporte público en la localidad","unidad":"Número"}]}]},{"codigo":"OEI.11","denominacion":"Modernizar la Gestión Institucional","indicadores":[{"nombre":"Porcentaje de ciudadanos satisfechos con la gestión institucional de la municipalidad","unidad":"Porcentaje"}],"aei":[{"codigo":"AEI.11.01","denominacion":"Capacitación para el desarrollo de competencias o conocimientos ejecutada en beneficio del personal de la municipalidad.","indicadores":[{"nombre":"Porcentaje de acciones de capacitación ejecutadas en el marco del PDP","unidad":"Porcentaje"}]},{"codigo":"AEI.11.02","denominacion":"Iniciativas de gobierno abierto implementado en la municipalidad","indicadores":[{"nombre":"Porcentaje de actas y acuerdos municipales difundidos en redes sociales y portales web municipales","unidad":"Porcentaje"}]},{"codigo":"AEI.11.03","denominacion":"Servicios administrativos implementados eficientemente en la municipalidad","indicadores":[{"nombre":"Porcentaje de expedientes recibidos por mesa de partes atendidos de manera oportuna","unidad":"Porcentaje"}]},{"codigo":"AEI.11.04","denominacion":"Recaudación tributaria efectiva en la municipalidad","indicadores":[{"nombre":"Número de campañas municipales para fortalecer la recaudación tributaria en la localidad","unidad":"Número"}]},{"codigo":"AEI.11.05","denominacion":"Instrumentos de gestión implementados en la municipalidad","indicadores":[{"nombre":"Porcentaje de instrumentos de gestión actualizados","unidad":"Porcentaje"}]},{"codigo":"AEI.11.06","denominacion":"Gobierno digital implementado en los procesos y servicios de la municipalidad","indicadores":[{"nombre":"Porcentaje de servicios administrativos municipales digitalizados","unidad":"Porcentaje"}]}]}]};
+
+// ============================================
+// CONFIGURACIÓN DINÁMICA DE URL (LOCAL VS RENDER)
+// ============================================
+// Agregamos la validación para archivos locales ( === '' )
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+
+// IMPORTANTE: Aquí colocarás el enlace definitivo que te dé Render
+const RENDER_API_URL = "https://pei-ceplan-vr1m.onrender.com";
+
+// Usamos localhost en lugar de 127.0.0.1 para evitar conflictos de CORS en el navegador
+const API_BASE_URL = isLocal ? "http://localhost:8000" : RENDER_API_URL;
+
+// ESTADO GLOBAL DE LA APP
+const appState = {
+  datos: {},
+  metas: {},
+  selecciones: { oei: [], indicadoresOEI: [], aei: [], indicadoresAEI: [] },
+  prioridades: { oei: [], aei: {} }
+};
+
+let pasoActual = 1;
+let draggedElement = null;
+let draggedAEIElement = null;
+
+window.addEventListener('load', () => {
+  renderizarOEIs();
+  configurarAutocompletadoUE();
+});
+
+// ============================================
+// AUTOCOMPLETADO POR CÓDIGO UE
+// ============================================
+function configurarAutocompletadoUE() {
+  const inputCodigoUE = document.getElementById('codigo_ue');
+  if (!inputCodigoUE) return;
+
+  const buscarYAutocompletar = async (event) => {
+    const codigoUE = inputCodigoUE.value.trim();
+    if (!codigoUE) return;
+
+    // --- AQUÍ UTILIZA LA URL DINÁMICA ---
+    const url = `${API_BASE_URL}/api/ue/${codigoUE}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const res = await response.json();
+      if (res.success && res.data) {
+        const data = res.data;
+        const inputMun = document.getElementById('nombre_municipio');
+        const inputProv = document.getElementById('nombre_provincia');
+        const inputReg = document.getElementById('nombre_region');
+        const inputPeriodo = document.getElementById('periodo_pei');
+
+        if (inputMun) inputMun.value = data.nombre_municipio || '';
+        if (inputProv) inputProv.value = data.nombre_provincia || '';
+        if (inputReg) inputReg.value = data.nombre_region || '';
+        if (inputPeriodo && data.periodo_pei) inputPeriodo.value = data.periodo_pei;
+
+        console.log('✅ Entidad autocompletada con éxito:', data);
+      }
+    } catch (err) {
+      console.error('Error al consultar el catálogo de UEs:', err);
+    }
+  };
+
+  inputCodigoUE.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      buscarYAutocompletar(e);
+    }
+  });
+
+  inputCodigoUE.addEventListener('blur', (e) => {
+    buscarYAutocompletar(e);
+  });
+}
+
+// ============================================
+// RENDERIZADO OEI / AEI
+// ============================================
+function renderizarOEIs() {
+  const container = document.getElementById('oeiContainer');
+  container.innerHTML = '';
+  MATRIZ_ESTANDAR.oei.forEach(oei => container.appendChild(crearOEICard(oei)));
+}
+
+function crearOEICard(oei) {
+  const card = document.createElement('div');
+  card.className = 'oei-card';
+  card.dataset.codigo = oei.codigo;
+
+  card.innerHTML = `
+    <div class="oei-header" onclick="toggleOEIExpand('${oei.codigo}')">
+      <input type="checkbox" class="oei-checkbox" id="oei-${oei.codigo}"
+             onclick="event.stopPropagation(); toggleOEISelection('${oei.codigo}')">
+      <div class="oei-info">
+        <div class="oei-code">${oei.codigo}</div>
+        <div class="oei-title">${oei.denominacion}</div>
+        <div style="margin-top:4px;font-size:11px;color:#64748b">
+          ${oei.indicadores.length} ind. OEI &bull; ${oei.aei.length} AEI
+        </div>
+      </div>
+      <div class="oei-expand-icon">▼</div>
+    </div>
+    <div class="oei-details">
+      ${crearSeccionIndicadoresOEI(oei)}
+      ${crearSeccionAEI(oei)}
+    </div>`;
+  return card;
+}
+
+function crearSeccionIndicadoresOEI(oei) {
+  let html = '<div class="subsection-title">Indicadores del OEI</div>';
+  oei.indicadores.forEach((ind, i) => {
+    html += `<div class="indicator-item">
+      <input type="checkbox" class="indicator-checkbox" id="ind-oei-${oei.codigo}-${i}"
+             data-oei="${oei.codigo}" data-tipo="oei" data-index="${i}">
+      <label for="ind-oei-${oei.codigo}-${i}" class="indicator-text">
+        ${ind.nombre} <span class="indicator-unit">${ind.unidad}</span>
+      </label>
+    </div>`;
+  });
+  return html;
+}
+
+function crearSeccionAEI(oei) {
+  let html = `<div class="subsection-title" style="margin-top:12px">Acciones Estratégicas Institucionales (AEI) <span class="counter-badge" style="background:var(--ceplan-blue)">${oei.aei.length}</span></div>`;
+  oei.aei.forEach(aei => {
+    html += `<div class="aei-item" id="aei-item-${aei.codigo}">
+      <input type="checkbox" class="aei-checkbox" id="aei-${aei.codigo}"
+             data-oei="${oei.codigo}" data-codigo="${aei.codigo}"
+             onchange="toggleAEI('${oei.codigo}','${aei.codigo}')">
+      <div style="flex:1">
+        <div class="aei-code">${aei.codigo}</div>
+        <div class="indicator-text">${aei.denominacion}</div>
+        <div class="aei-details-panel" id="aei-details-${aei.codigo}">
+          ${crearIndicadoresAEI(oei.codigo, aei)}
+        </div>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+function crearIndicadoresAEI(codigoOEI, aei) {
+  let html = '<div class="subsection-title" style="font-size:11px;margin-top:6px">Indicadores de la AEI</div>';
+  aei.indicadores.forEach((ind, i) => {
+    html += `<div class="indicator-item">
+      <input type="checkbox" class="indicator-checkbox" id="ind-aei-${aei.codigo}-${i}"
+             data-oei="${codigoOEI}" data-aei="${aei.codigo}" data-tipo="aei" data-index="${i}">
+      <label for="ind-aei-${aei.codigo}-${i}" class="indicator-text">
+        ${ind.nombre} <span class="indicator-unit">${ind.unidad}</span>
+      </label>
+    </div>`;
+  });
+  return html;
+}
+
+// ============================================
+// INTERACCIONES & GESTIÓN DE PRIORIDADES
+// ============================================
+function toggleOEIExpand(codigo) {
+  document.querySelector(`.oei-card[data-codigo="${codigo}"]`).classList.toggle('expanded');
+}
+
+function toggleOEISelection(codigo) {
+  const checkbox = document.getElementById(`oei-${codigo}`);
+  const card = document.querySelector(`.oei-card[data-codigo="${codigo}"]`);
+
+  if (checkbox.checked) {
+    card.classList.add('selected', 'expanded');
+    agregarOEIAPrioridad(codigo);
+  } else {
+    card.classList.remove('selected');
+    card.querySelectorAll('input[type="checkbox"]').forEach(cb => { if (cb !== checkbox) cb.checked = false; });
+    card.querySelectorAll('.aei-details-panel').forEach(p => p.style.display = 'none');
+    card.querySelectorAll('.aei-item').forEach(i => i.classList.remove('selected'));
+    const priorityItem = document.querySelector(`.priority-item[data-codigo="${codigo}"]`);
+    if (priorityItem) priorityItem.remove();
+    actualizarNumerosPrioridad();
+    actualizarContadorPrioridad();
+    verificarPriorityEmpty();
+  }
+}
+
+function toggleAEI(codigoOEI, codigoAEI) {
+  const checkbox = document.getElementById(`aei-${codigoAEI}`);
+  const details = document.getElementById(`aei-details-${codigoAEI}`);
+  const aeiItem = document.getElementById(`aei-item-${codigoAEI}`);
+
+  if (checkbox.checked) {
+    details.style.display = 'block';
+    aeiItem.classList.add('selected');
+  } else {
+    details.style.display = 'none';
+    aeiItem.classList.remove('selected');
+    details.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  }
+  actualizarAEIEnPrioridad(codigoOEI);
+}
+
+function agregarOEIAPrioridad(codigo) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigo);
+  if (!oei) return;
+  const container = document.getElementById('priorityContainer');
+  const empty = container.querySelector('.empty-state');
+  if (empty) empty.remove();
+  container.appendChild(crearPriorityItem(oei));
+  habilitarDragAndDrop();
+  actualizarNumerosPrioridad();
+  actualizarContadorPrioridad();
+}
+
+function crearPriorityItem(oei) {
+  const div = document.createElement('div');
+  div.className = 'priority-item';
+  div.dataset.codigo = oei.codigo;
+  div.draggable = true;
+  div.innerHTML = `
+    <div class="priority-number">1</div>
+    <button class="remove-btn" onclick="eliminarOEIDePrioridad('${oei.codigo}')" title="Eliminar">✕</button>
+    <div class="priority-header">
+      <div class="drag-handle">⋮⋮</div>
+      <div style="flex:1">
+        <div class="priority-code">${oei.codigo}</div>
+        <div class="priority-title">${oei.denominacion}</div>
+        <div class="priority-stats" id="stats-${oei.codigo}">
+          <div class="priority-stat">0 ind.</div>
+          <div class="priority-stat">0 AEI</div>
+        </div>
+      </div>
+    </div>
+    <button class="expand-aei-btn" onclick="toggleAEIPriority('${oei.codigo}')">Priorizar AEI vinculadas ▼</button>
+    <div class="aei-priority-list" id="aei-priority-${oei.codigo}"></div>`;
+  return div;
+}
+
+function eliminarOEIDePrioridad(codigo) {
+  const checkbox = document.getElementById(`oei-${codigo}`);
+  if (checkbox && checkbox.checked) {
+    checkbox.checked = false;
+    toggleOEISelection(codigo);
+    return;
+  }
+  const priorityItem = document.querySelector(`.priority-item[data-codigo="${codigo}"]`);
+  if (priorityItem) priorityItem.remove();
+  actualizarNumerosPrioridad();
+  actualizarContadorPrioridad();
+  verificarPriorityEmpty();
+}
+
+function verificarPriorityEmpty() {
+  const container = document.getElementById('priorityContainer');
+  if (container.querySelectorAll('.priority-item').length === 0) {
+    container.innerHTML = `<div class="empty-state">Los OEI seleccionados aparecerán aquí para su priorización.</div>`;
+  }
+}
+
+function actualizarAEIEnPrioridad(codigoOEI) {
+  const stats = document.getElementById(`stats-${codigoOEI}`);
+  if (!stats) return;
+  const numInd = document.querySelectorAll(`input[data-oei="${codigoOEI}"]:checked:not(.oei-checkbox):not(.aei-checkbox)`).length;
+  const numAEI = document.querySelectorAll(`input[data-oei="${codigoOEI}"].aei-checkbox:checked`).length;
+  stats.innerHTML = `<div class="priority-stat">${numInd} ind.</div><div class="priority-stat">${numAEI} AEI</div>`;
+  const pItem = document.querySelector(`.priority-item[data-codigo="${codigoOEI}"]`);
+  if (pItem && pItem.classList.contains('expanded')) {
+    const aeiList = document.getElementById(`aei-priority-${codigoOEI}`);
+    aeiList.innerHTML = crearListaAEIPrioridad(codigoOEI);
+    habilitarDragAndDropAEI();
+  }
+}
+
+function toggleAEIPriority(codigoOEI) {
+  const pItem = document.querySelector(`.priority-item[data-codigo="${codigoOEI}"]`);
+  const btn = pItem.querySelector('.expand-aei-btn');
+  const aeiList = document.getElementById(`aei-priority-${codigoOEI}`);
+  pItem.classList.toggle('expanded');
+  if (pItem.classList.contains('expanded')) {
+    btn.textContent = 'Ocultar AEI ▲';
+    aeiList.innerHTML = crearListaAEIPrioridad(codigoOEI);
+    habilitarDragAndDropAEI();
+  } else {
+    btn.textContent = 'Priorizar AEI vinculadas ▼';
+  }
+}
+
+function crearListaAEIPrioridad(codigoOEI) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigoOEI);
+  const aeiSel = oei ? oei.aei.filter(a => {
+    const cb = document.getElementById(`aei-${a.codigo}`);
+    return cb && cb.checked;
+  }) : [];
+  if (!aeiSel.length) return '<div style="text-align:center;padding:10px;color:#94a3b8;font-size:11px">Sin AEI seleccionadas</div>';
+  let html = '<div style="font-size:11px;font-weight:700;margin-bottom:6px;color:var(--ceplan-blue)">Arrastre las AEI para definir prioridad:</div><div class="aei-sortable">';
+  aeiSel.forEach((aei, i) => {
+    html += `<div class="aei-priority-item" data-codigo="${aei.codigo}" draggable="true">
+      <div class="aei-priority-number">${i+1}</div>
+      <div class="aei-priority-code">${aei.codigo}</div>
+      <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${aei.denominacion}</div>
+    </div>`;
+  });
+  return html + '</div>';
+}
+
+function actualizarNumerosPrioridad() {
+  document.querySelectorAll('.priority-item').forEach((item, i) => {
+    item.querySelector('.priority-number').textContent = i + 1;
+  });
+}
+
+function actualizarContadorPrioridad() {
+  document.getElementById('priorityCount').textContent = document.querySelectorAll('.priority-item').length;
+}
+
+// ============================================
+// DRAG & DROP HANDLERS
+// ============================================
+function habilitarDragAndDrop() {
+  document.querySelectorAll('.priority-item').forEach(item => {
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragover', handleDragOver);
+    item.addEventListener('drop', handleDrop);
+    item.addEventListener('dragend', handleDragEnd);
+  });
+}
+function handleDragStart(e) { draggedElement = this; this.style.opacity = '0.5'; e.dataTransfer.effectAllowed = 'move'; }
+function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+function handleDragEnd(e) { this.style.opacity = '1'; }
+function handleDrop(e) {
+  e.stopPropagation();
+  if (draggedElement !== this) {
+    const container = document.getElementById('priorityContainer');
+    const items = Array.from(container.children);
+    const di = items.indexOf(draggedElement), ti = items.indexOf(this);
+    container.insertBefore(draggedElement, di < ti ? this.nextSibling : this);
+    actualizarNumerosPrioridad();
+  }
+  return false;
+}
+
+function habilitarDragAndDropAEI() {
+  document.querySelectorAll('.aei-priority-item').forEach(item => {
+    item.addEventListener('dragstart', function(e) { draggedAEIElement = this; e.dataTransfer.effectAllowed = 'move'; });
+    item.addEventListener('dragover', function(e) { e.preventDefault(); return false; });
+    item.addEventListener('drop', function(e) {
+      e.stopPropagation();
+      if (draggedAEIElement !== this && draggedAEIElement.parentNode === this.parentNode) {
+        const container = this.parentNode;
+        const items = Array.from(container.children);
+        const di = items.indexOf(draggedAEIElement), ti = items.indexOf(this);
+        container.insertBefore(draggedAEIElement, di < ti ? this.nextSibling : this);
+        container.querySelectorAll('.aei-priority-item').forEach((it, i) => { it.querySelector('.aei-priority-number').textContent = i + 1; });
+      }
+      return false;
+    });
+  });
+}
+
+// ============================================
+// METAS FÍSICAS (PASO 3)
+// ============================================
+function renderizarMetasIndicadores() {
+  const container = document.getElementById('metasContainer');
+  container.innerHTML = '';
+  const priorityItems = document.querySelectorAll('.priority-item');
+  if (!priorityItems.length) {
+    container.innerHTML = '<div class="empty-state">No hay indicadores seleccionados. Regrese al Paso 2.</div>';
+    return;
+  }
+  priorityItems.forEach((item, i) => {
+    const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === item.dataset.codigo);
+    if (oei) container.appendChild(crearSeccionMetasOEI(oei, i + 1));
+  });
+}
+
+function crearSeccionMetasOEI(oei, prioridad) {
+  const section = document.createElement('div');
+  section.className = 'metas-oei-section';
+  const indOEI = getIndicadoresOEISeleccionados(oei.codigo);
+  const indAEI = getIndicadoresAEISeleccionados(oei.codigo);
+  section.innerHTML = `
+    <div class="metas-oei-header">
+      <div class="metas-oei-priority">Prioridad ${prioridad}</div>
+      <div class="metas-oei-title">${oei.codigo}: ${oei.denominacion}</div>
+    </div>
+    <div>
+      ${indOEI.length ? '<div class="metas-tipo-header">Indicadores del Objetivo Estratégico (OEI)</div>' + indOEI.map(crearFormularioMeta).join('') : ''}
+      ${indAEI.length ? '<div class="metas-tipo-header">Indicadores de Acciones Estratégicas (AEI)</div>' + agruparPorAEI(indAEI) : ''}
+    </div>`;
+  return section;
+}
+
+function getIndicadoresOEISeleccionados(codigoOEI) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigoOEI);
+  if (!oei) return [];
+  return oei.indicadores.map((ind, i) => {
+    const cb = document.getElementById(`ind-oei-${codigoOEI}-${i}`);
+    return (cb && cb.checked) ? { id: `ind-oei-${codigoOEI}-${i}`, nombre: ind.nombre, unidad: ind.unidad } : null;
+  }).filter(Boolean);
+}
+
+function getIndicadoresAEISeleccionados(codigoOEI) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigoOEI);
+  if (!oei) return [];
+  const result = [];
+  oei.aei.forEach(aei => {
+    const aeiCb = document.getElementById(`aei-${aei.codigo}`);
+    if (!(aeiCb && aeiCb.checked)) return;
+    aei.indicadores.forEach((ind, i) => {
+      const cb = document.getElementById(`ind-aei-${aei.codigo}-${i}`);
+      if (cb && cb.checked) result.push({ id: `ind-aei-${aei.codigo}-${i}`, nombre: ind.nombre, unidad: ind.unidad, codigoAEI: aei.codigo, denominacionAEI: aei.denominacion });
+    });
+  });
+  return result;
+}
+
+function agruparPorAEI(indicadores) {
+  const grupos = {};
+  indicadores.forEach(ind => {
+    if (!grupos[ind.codigoAEI]) grupos[ind.codigoAEI] = { denominacion: ind.denominacionAEI, indicadores: [] };
+    grupos[ind.codigoAEI].indicadores.push(ind);
+  });
+  return Object.entries(grupos).map(([cod, g]) =>
+    `<div class="metas-aei-subtitle">${cod}: ${g.denominacion}</div>` + g.indicadores.map(crearFormularioMeta).join('')
+  ).join('');
+}
+
+function obtenerAniosMeta(baseYear) {
+  const base = parseInt(baseYear, 10);
+  if (!baseYear || Number.isNaN(base)) return [];
+  return Array.from({ length: 5 }, (_, i) => base + i + 2);
+}
+
+function crearFormularioMeta(ind) {
+  const saved = appState.metas[ind.id] || {};
+  const anios = obtenerAniosMeta(saved.año_base ?? '');
+  const aniosHtml = anios.map(a => `
+    <div class="meta-field">
+      <label>Meta ${a} *</label>
+      <input type="number" id="${ind.id}-meta_${a}" class="meta-input"
+             placeholder="0" min="0" step="0.01" value="${saved['meta_'+a] ?? ''}"
+             oninput="guardarMeta('${ind.id}','meta_${a}',this.value)">
+    </div>`).join('');
+  return `<div class="meta-card">
+    <div class="meta-header">
+      <div style="flex:1">
+        <div class="meta-nombre">${ind.nombre}</div>
+        <span class="meta-unidad">Unidad: ${ind.unidad}</span>
+      </div>
+    </div>
+    <div class="meta-form-grid">
+      <div class="meta-field">
+        <label>Año Base *</label>
+        <input type="number" id="${ind.id}-año_base" class="meta-input" placeholder="2025"
+               min="2020" max="2030" value="${saved.año_base ?? ''}"
+               oninput="guardarMeta('${ind.id}','año_base',this.value); actualizarMetaDesdeBaseYear('${ind.id}', this.value)">
+      </div>
+      <div class="meta-field">
+        <label>Valor Base *</label>
+        <input type="number" id="${ind.id}-valor_base" class="meta-input" placeholder="0"
+               min="0" step="0.01" value="${saved.valor_base ?? ''}"
+               oninput="guardarMeta('${ind.id}','valor_base',this.value)">
+      </div>
+    </div>
+    <div class="meta-años-grid">${aniosHtml}</div>
+  </div>`;
+}
+
+function actualizarMetaDesdeBaseYear(indId, valor) {
+  guardarMeta(indId, 'año_base', valor);
+  const card = document.getElementById(`${indId}-año_base`)?.closest('.meta-card');
+  if (!card) return;
+  const grid = card.querySelector('.meta-años-grid');
+  if (!grid) return;
+  const saved = appState.metas[indId] || {};
+  const anios = obtenerAniosMeta(valor);
+  grid.innerHTML = anios.map(a => `
+    <div class="meta-field">
+      <label>Meta ${a} *</label>
+      <input type="number" id="${indId}-meta_${a}" class="meta-input"
+             placeholder="0" min="0" step="0.01" value="${saved['meta_' + a] ?? ''}"
+             oninput="guardarMeta('${indId}','meta_${a}',this.value)">
+    </div>`).join('');
+}
+
+function guardarMeta(id, campo, valor) {
+  if (!appState.metas[id]) appState.metas[id] = {};
+  appState.metas[id][campo] = valor !== '' ? parseFloat(valor) : '';
+}
+
+// ============================================
+// NAVEGACIÓN
+// ============================================
+function irPaso(paso) {
+  document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active', 'completed'));
+  for (let i = 1; i < paso; i++) {
+    document.querySelector(`.step[data-step="${i}"]`).classList.add('completed');
+  }
+  document.querySelector(`.form-step[data-step="${paso}"]`).classList.add('active');
+  document.querySelector(`.step[data-step="${paso}"]`).classList.add('active');
+  pasoActual = paso;
+  if (paso === 3) renderizarMetasIndicadores();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function irPaso1a2() {
+  const ue = document.getElementById('codigo_ue').value.trim();
+  const mun = document.getElementById('nombre_municipio').value.trim();
+  const mis = document.getElementById('mision_institucional').value.trim();
+  if (!ue || !mun || !mis) {
+    alert('Por favor complete los campos obligatorios: Código UE, Nombre de la Entidad y Misión Institucional.');
+    return;
+  }
+  irPaso(2);
+}
+
+function validarYContinuarAMetas() {
+  const alert = document.getElementById('selectionAlert');
+  const oeiChecked = document.querySelectorAll('.oei-checkbox:checked');
+  if (!oeiChecked.length) {
+    alert.textContent = '⚠️ Debe seleccionar al menos 1 OEI con sus respectivos indicadores y AEI antes de continuar.';
+    alert.classList.add('show');
+    return;
+  }
+  let valido = true;
+  oeiChecked.forEach(cb => {
+    const codigo = cb.id.replace('oei-', '');
+    const card = document.querySelector(`.oei-card[data-codigo="${codigo}"]`);
+    const indOEI = card.querySelectorAll('input[data-tipo="oei"]:checked').length;
+    const aeiSel = card.querySelectorAll('.aei-checkbox:checked').length;
+    if (!indOEI || !aeiSel) valido = false;
+  });
+  if (!valido) {
+    alert.innerHTML = '⚠️ Cada OEI seleccionado debe contar al menos con 1 indicador y 1 AEI seleccionada.';
+    alert.classList.add('show');
+    return;
+  }
+  alert.classList.remove('show');
+  irPaso(3);
+}
+
+function validarMetasYContinuar() {
+  const alert = document.getElementById('metasAlert');
+  const inputs = document.querySelectorAll('#metasContainer .meta-input');
+  let hayVacios = false;
+  inputs.forEach(inp => {
+    if (inp.value === '' || inp.value === null) { hayVacios = true; inp.classList.add('error'); }
+    else inp.classList.remove('error');
+  });
+  if (hayVacios) { alert.classList.add('show'); alert.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  alert.classList.remove('show');
+  actualizarResumenFinal();
+  irPaso(4);
+}
+
+function actualizarResumenFinal() {
+  document.getElementById('resumenOEI').textContent = document.querySelectorAll('.oei-checkbox:checked').length + ' OEI seleccionados';
+  document.getElementById('resumenAEI').textContent = document.querySelectorAll('.aei-checkbox:checked').length + ' AEI seleccionadas';
+  document.getElementById('resumenIndicadores').textContent = document.querySelectorAll('.indicator-checkbox:checked').length + ' indicadores totales';
+  document.getElementById('resumenMetas').textContent = Object.keys(appState.metas).length + ' indicadores con metas programadas';
+}
+
+// ============================================
+// GENERACIÓN Y EXPORTACIÓN PEI (EN MEMORIA)
+// ============================================
+async function generarDocumento() {
+  const btn = document.getElementById('btnGenerar');
+  const msg = document.getElementById('message');
+  const payload = construirPayload();
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Procesando Instrumento PEI...';
+  msg.className = 'message';
+  msg.style.display = 'none';
+
+  try {
+    // --- AQUÍ UTILIZA LA URL DINÁMICA ---
+    const baseUrl = API_BASE_URL;
+    
+    const response = await fetch(`${baseUrl}/generar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMsg = `Error HTTP ${response.status}`;
+      try { const errJson = JSON.parse(errorText); errorMsg = errJson.error || errorMsg; } catch (e) {}
+      throw new Error(errorMsg);
+    }
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    
+    const nombreMunicipio = document.getElementById('nombre_municipio')?.value.trim() || 'Municipio';
+    const nombreArchivo = `PEI_${nombreMunicipio.replace(/\s+/g, '_')}.docx`;
+
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(downloadUrl);
+
+    msg.className = 'message success';
+    msg.style.display = 'block';
+    msg.innerHTML = `
+      <strong>✅ ¡Documento PEI generado exitosamente!</strong><br><br>
+      <strong>📄 Archivo:</strong> ${nombreArchivo}<br><br>
+      <small>El archivo ha sido emitido y descargado automáticamente a tu equipo.</small>`;
+  } catch (err) {
+    msg.className = 'message error';
+    msg.style.display = 'block';
+    msg.innerHTML = `
+      <strong>❌ Error al procesar el documento</strong><br><br>
+      <strong>Detalle:</strong> ${err.message}`;
+    console.error('Error generando documento:', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Generar Documento PEI (.docx)';
+  }
+}
+
+function construirPayload() {
+  const campos = ['codigo_ue','nombre_municipio','periodo_pei','nombre_provincia','nombre_region',
+    'nombre_alcalde','resolucion_alcaldia','plan_desarrollo_concertado','ordenanza_pdc',
+    'mision_institucional','politica_general_gobierno','decreto_politica_general_gobierno'];
+  const data = {};
+  campos.forEach(c => { const el = document.getElementById(c); if (el) data[c] = el.value.trim(); });
+
+  data.selecciones = {
+    oei: Array.from(document.querySelectorAll('.oei-checkbox:checked')).map(cb => cb.id),
+    indicadoresOEI: Array.from(document.querySelectorAll('input[data-tipo="oei"]:checked')).map(cb => cb.id),
+    aei: Array.from(document.querySelectorAll('.aei-checkbox:checked')).map(cb => cb.id),
+    indicadoresAEI: Array.from(document.querySelectorAll('input[data-tipo="aei"]:checked')).map(cb => cb.id)
+  };
+
+  const oeiOrder = Array.from(document.querySelectorAll('.priority-item')).map(i => i.dataset.codigo);
+  const aeiOrder = {};
+  oeiOrder.forEach(cod => {
+    const codEscapado = cod.replace(/\./g, '\\.');
+    const sortable = document.querySelector(`#aei-priority-${codEscapado} .aei-sortable`);
+    if (sortable) aeiOrder[cod] = Array.from(sortable.querySelectorAll('.aei-priority-item')).map(i => i.dataset.codigo);
+  });
+  data.prioridades = { oei: oeiOrder, aei: aeiOrder };
+  data.metas = appState.metas;
+
+  return data;
+}
+
+function limpiarFormulario() {
+  if (confirm('¿Desea restablecer todos los campos del formulario?')) {
+    appState.metas = {};
+    appState.selecciones = { oei: [], indicadoresOEI: [], aei: [], indicadoresAEI: [] };
+    appState.prioridades = { oei: [], aei: {} };
+    ['codigo_ue','periodo_pei','nombre_municipio','nombre_provincia','nombre_region',
+     'nombre_alcalde','resolucion_alcaldia','plan_desarrollo_concertado','ordenanza_pdc',
+     'mision_institucional','politica_general_gobierno','decreto_politica_general_gobierno'
+    ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('priorityContainer').innerHTML = `<div class="empty-state">Los OEI seleccionados aparecerán aquí para su priorización.</div>`;
+    document.getElementById('priorityCount').textContent = '0';
+    renderizarOEIs();
+    irPaso(1);
+  }
+}
+</script>
 </body>
 </html>
