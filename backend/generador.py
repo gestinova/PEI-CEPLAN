@@ -7,6 +7,8 @@ import json, os, sys, re, io, urllib.parse, subprocess, importlib.util
 from pathlib import Path
 from urllib.parse import urlparse
 import pandas as pd
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / 'frontend'

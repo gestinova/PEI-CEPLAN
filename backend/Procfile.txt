@@ -1,1 +1,0 @@
-web: gunicorn generador_pei_fase4:app
