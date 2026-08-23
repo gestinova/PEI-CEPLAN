@@ -36,7 +36,7 @@
       <!-- PASO 1 -->
       <div class="form-step active" data-step="1">
         <div class="section">
-          <h2 class="section-title">🏢 Datos Generales del Pliego / Unidad Ejecutora</h2>
+          <h2 class="section-title">Datos Generales del Pliego / Unidad Ejecutora</h2>
           <div class="two-column">
             <div class="form-group">
               <label>Código UE *</label>
@@ -54,7 +54,7 @@
         </div>
 
         <div class="section">
-          <h2 class="section-title">📑 Marco Normativo y Documentos de Gestión</h2>
+          <h2 class="section-title">Marco Normativo y Documentos de Gestión</h2>
           <div class="form-group"><label>Resolución de Aprobación</label><input type="text" id="resolucion_alcaldia" placeholder="Ej: Resolución de Alcaldía N° 001-2024-MDV"></div>
           <div class="form-group"><label>Plan de Desarrollo Concertado (PDC)</label><input type="text" id="plan_desarrollo_concertado" placeholder="Ej: Plan de Desarrollo Concertado al 2030"></div>
           <div class="form-group"><label>Ordenanza del PDC</label><input type="text" id="ordenanza_pdc" placeholder="Ej: Ordenanza Municipal N° 012-2023-MDV"></div>
@@ -63,12 +63,12 @@
         </div>
 
         <div class="section">
-          <h2 class="section-title">🎯 Misión Institucional</h2>
+          <h2 class="section-title">Misión Institucional</h2>
           <div class="form-group"><label>Declaración de la Misión Institucional *</label><textarea id="mision_institucional" placeholder="Escriba la misión institucional aprobada..."></textarea></div>
         </div>
 
         <div class="btn-container">
-          <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">🔄 Restablecer Formulario</button>
+          <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">Restablecer Formulario</button>
           <button type="button" class="btn btn-primary" onclick="irPaso1a2()">Siguiente: Seleccionar OEI/AEI →</button>
         </div>
       </div>
@@ -76,13 +76,13 @@
       <!-- PASO 2 -->
       <div class="form-step" data-step="2">
         <div class="section">
-          <h2 class="section-title">📋 Selección y Priorización de Objetivos (OEI) y Acciones (AEI)</h2>
+          <h2 class="section-title">Selección y Priorización de Objetivos (OEI) y Acciones (AEI)</h2>
           <div class="help-text">
             <strong>Instrucciones:</strong><br>
             1. En el panel izquierdo marque los Objetivos Estratégicos Institucionales (OEI) e indicadores aplicables.<br>
             2. En el panel derecho arrastre los bloques para definir el orden de prioridad institucional.
           </div>
-          <div class="selection-alert" id="selectionAlert">⚠️ Debe seleccionar al menos 1 OEI con sus respectivos indicadores y AEI antes de continuar.</div>
+          <div class="selection-alert" id="selectionAlert">Debe seleccionar al menos 1 OEI con sus respectivos indicadores y AEI antes de continuar.</div>
           <div class="selection-layout">
             <div class="selection-panel">
               <div class="panel-title"><span>Catálogo Estándar CEPLAN</span></div>
@@ -110,7 +110,7 @@
       <!-- PASO 3 -->
       <div class="form-step" data-step="3">
         <div class="section">
-          <h2 class="section-title">📊 Programación de Logros Esperados y Metas Anuales</h2>
+          <h2 class="section-title">Programación de Logros Esperados y Metas Anuales</h2>
           <div class="help-text">
             <strong>Instrucciones:</strong> Registre el año base, valor base y los valores objetivo para cada año del período PEI.
           </div>
@@ -126,7 +126,7 @@
       <!-- PASO 4 -->
       <div class="form-step" data-step="4">
         <div class="section">
-          <h2 class="section-title">📄 Generación del Documento PEI</h2>
+          <h2 class="section-title">Generación del Documento PEI</h2>
           <div class="help-text">
             <strong>Resumen del Instrumento de Gestión:</strong><br>
             • <span id="resumenOEI">0 OEI seleccionados</span><br>
@@ -158,9 +158,13 @@ const MATRIZ_ESTANDAR = {"oei":[{"codigo":"OEI.01","denominacion":"Promover el o
 // ============================================
 // CONFIGURACIÓN DINÁMICA DE URL (LOCAL VS RENDER)
 // ============================================
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-// IMPORTANTE: Aquí colocarás el enlace que te dé Render una vez que despliegues el backend
+// Agregamos la validación para archivos locales ( === '' )
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+
+// IMPORTANTE: Aquí colocarás el enlace definitivo que te dé Render
 const RENDER_API_URL = "https://tu-backend-pei.onrender.com";
+
+// Usamos localhost en lugar de 127.0.0.1 para evitar conflictos de CORS en el navegador
 const API_BASE_URL = isLocal ? "http://localhost:8000" : RENDER_API_URL;
 
 // ESTADO GLOBAL DE LA APP
