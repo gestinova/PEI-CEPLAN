@@ -164,7 +164,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-def generar_documento(self, data):
+    def generar_documento(self, data):
         print("\n" + "="*70)
         print("GENERANDO DOCUMENTO PEI EN MEMORIA")
         print("="*70)
