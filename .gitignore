@@ -1,1 +1,9 @@
 __pycache__/
+*.py[cod]
+.codegraph/
+.pytest_cache/
+archivos-gen/*
+!archivos-gen/.gitkeep
+!archivos-gen/IT_PEI.xlsx
+~$*.docx
+.venv/

@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generador de Documentos PEI - Sistema Completo</title>
+<style>
+/* ============================================
+   GENERADOR PEI - ESTILOS COMPLETOS
+   ============================================ */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}
+.container{max-width:1400px;margin:0 auto;background:white;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px;text-align:center}
+.header h1{font-size:28px;margin-bottom:10px}
+.header p{font-size:14px;opacity:.9}
+
+/* PROGRESS */
+.progress-steps{display:flex;justify-content:space-between;padding:30px 40px;background:#f8f9fa;border-bottom:2px solid #e0e0e0}
+.step{flex:1;text-align:center;position:relative}
+.step::after{content:'';position:absolute;top:20px;left:50%;width:100%;height:2px;background:#e0e0e0;z-index:0}
+.step:last-child::after{display:none}
+.step-number{width:40px;height:40px;border-radius:50%;background:#e0e0e0;color:#999;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;position:relative;z-index:1;margin-bottom:10px}
+.step.active .step-number{background:#667eea;color:white}
+.step.completed .step-number{background:#28a745;color:white}
+.step-label{font-size:13px;color:#666;font-weight:500}
+.step.active .step-label{color:#667eea;font-weight:600}
+
+/* FORM */
+.form-container{padding:40px}
+.form-step{display:none}
+.form-step.active{display:block}
+.section{margin-bottom:35px}
+.section-title{color:#667eea;font-size:20px;font-weight:600;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #e0e0e0;display:flex;align-items:center}
+.section-title::before{content:"📋";margin-right:10px;font-size:24px}
+.form-group{margin-bottom:20px}
+label{display:block;color:#333;font-weight:500;margin-bottom:8px;font-size:14px}
+input[type="text"],textarea{width:100%;padding:12px 15px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;font-family:inherit;transition:all .3s}
+input[type="text"]:focus,textarea:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.1)}
+textarea{min-height:100px;resize:vertical}
+.two-column{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.hint{font-size:11px;color:#666;margin-top:4px}
+
+/* SELECTION PASO 2 */
+.selection-layout{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px}
+.selection-panel{border:2px solid #e0e0e0;border-radius:12px;overflow:hidden}
+.panel-title{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 20px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px}
+.panel-subtitle{padding:10px 15px;background:#f8f9fa;font-size:12px;color:#666;border-bottom:1px solid #e0e0e0}
+.oei-grid{max-height:600px;overflow-y:auto;padding:15px}
+.oei-card{border:2px solid #e0e0e0;border-radius:10px;margin-bottom:12px;overflow:hidden;transition:all .3s}
+.oei-card.selected{border-color:#667eea;background:#f0f2ff}
+.oei-header{display:flex;align-items:flex-start;gap:12px;padding:15px;cursor:pointer;user-select:none}
+.oei-header:hover{background:rgba(102,126,234,.05)}
+.oei-checkbox{width:18px;height:18px;margin-top:3px;cursor:pointer;flex-shrink:0}
+.oei-info{flex:1}
+.oei-code{font-weight:700;color:#667eea;font-size:13px;margin-bottom:3px}
+.oei-title{font-size:14px;color:#333;line-height:1.4}
+.oei-expand-icon{color:#999;font-size:12px;transition:transform .3s;padding-top:4px}
+.oei-card.expanded .oei-expand-icon{transform:rotate(180deg)}
+.oei-details{display:none;padding:15px;background:#fafafa;border-top:1px solid #e0e0e0}
+.oei-card.expanded .oei-details{display:block}
+.subsection-title{font-size:12px;font-weight:700;color:#764ba2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;margin-top:10px}
+.indicator-item{display:flex;align-items:flex-start;gap:10px;padding:8px;border-radius:6px;margin-bottom:6px;transition:background .2s}
+.indicator-item:hover{background:rgba(102,126,234,.07)}
+.indicator-checkbox{width:16px;height:16px;margin-top:2px;cursor:pointer;flex-shrink:0}
+.indicator-text{font-size:13px;color:#444;line-height:1.4;cursor:pointer}
+.indicator-unit{display:inline-block;background:#e8eafd;color:#667eea;padding:2px 8px;border-radius:4px;font-size:11px;margin-left:6px;white-space:nowrap}
+.aei-item{display:flex;align-items:flex-start;gap:10px;padding:10px;border-radius:8px;margin-bottom:8px;border:1px solid #e0e0e0;background:white;transition:all .2s}
+.aei-item.selected{border-color:#764ba2;background:#f8f0ff}
+.aei-checkbox{width:16px;height:16px;margin-top:3px;cursor:pointer;flex-shrink:0}
+.aei-code{font-weight:600;color:#764ba2;font-size:12px;margin-bottom:3px}
+.aei-details-panel{margin-top:10px;padding:10px;background:#f0e8ff;border-radius:6px;display:none}
+.aei-item.selected .aei-details-panel{display:block}
+
+/* PRIORITY PANEL */
+.priority-list{max-height:600px;overflow-y:auto;padding:15px;min-height:200px}
+.counter-badge{background:rgba(255,255,255,.3);color:white;padding:2px 10px;border-radius:12px;font-size:13px;font-weight:700}
+.priority-item{border:2px solid #e0e0e0;border-radius:10px;padding:15px;margin-bottom:12px;background:white;position:relative;cursor:grab;transition:all .2s;user-select:none}
+.priority-item:hover{border-color:#667eea;box-shadow:0 4px 15px rgba(102,126,234,.2)}
+.priority-item.dragging{opacity:.5;border-style:dashed}
+.priority-item.drag-over{border-color:#764ba2;border-style:dashed;background:#f8f0ff}
+.priority-number{position:absolute;top:-10px;left:-10px;width:28px;height:28px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;box-shadow:0 3px 8px rgba(102,126,234,.4)}
+.remove-btn{position:absolute;top:8px;right:8px;background:#dc3545;color:white;border:none;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1}
+.priority-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.drag-handle{color:#ccc;font-size:18px;cursor:grab;padding-top:2px;flex-shrink:0}
+.priority-code{font-weight:700;color:#667eea;font-size:13px}
+.priority-title{font-size:13px;color:#333;line-height:1.4;margin-top:3px}
+.priority-stats{display:flex;gap:12px;margin-top:8px}
+.priority-stat{font-size:11px;color:#666;background:#f0f0f0;padding:3px 8px;border-radius:4px}
+.expand-aei-btn{background:#764ba2;color:white;border:none;padding:6px 12px;border-radius:5px;font-size:11px;cursor:pointer;transition:all .2s;width:100%}
+.expand-aei-btn:hover{background:#5f3883}
+.aei-priority-list{margin-top:10px;display:none}
+.priority-item.expanded .aei-priority-list{display:block}
+.aei-sortable{display:flex;flex-direction:column;gap:6px}
+.aei-priority-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e0e0e0;border-radius:6px;background:white;cursor:grab;position:relative;transition:all .2s}
+.aei-priority-item:hover{border-color:#764ba2;background:#f8f0ff}
+.aei-priority-item.dragging{opacity:.5}
+.aei-priority-number{min-width:22px;height:22px;background:linear-gradient(135deg,#764ba2,#9561e2);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+.aei-priority-code{font-weight:600;color:#764ba2;font-size:12px;white-space:nowrap}
+.aei-priority-title{font-size:11px;color:#555;line-height:1.3}
+.empty-state{text-align:center;padding:40px 20px;color:#999}
+.empty-state-icon{font-size:48px;margin-bottom:15px}
+.empty-state-text{font-size:14px;line-height:1.6}
+
+/* METAS PASO 3 */
+.metas-container{display:grid;gap:25px}
+.metas-oei-section{background:#f8f9fa;border-radius:12px;padding:20px;border:2px solid #e0e0e0}
+.metas-oei-header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:15px 20px;border-radius:8px;margin-bottom:20px}
+.metas-oei-priority{font-size:12px;opacity:.9;margin-bottom:5px}
+.metas-oei-title{font-size:16px;font-weight:600}
+.metas-indicadores-container{display:grid;gap:15px}
+.metas-tipo-header{font-size:14px;font-weight:600;color:#667eea;margin:20px 0 15px;padding-bottom:8px;border-bottom:2px solid #e0e0e0}
+.metas-aei-subtitle{font-size:13px;font-weight:600;color:#764ba2;margin:15px 0 10px;padding:8px 12px;background:white;border-radius:6px;border-left:3px solid #764ba2}
+.meta-card{background:white;border:2px solid #e0e0e0;border-radius:10px;padding:20px;transition:all .3s}
+.meta-card:hover{border-color:#667eea;box-shadow:0 4px 12px rgba(102,126,234,.15)}
+.meta-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #e0e0e0}
+.meta-icon{font-size:24px}
+.meta-info{flex:1}
+.meta-nombre{font-size:14px;font-weight:500;color:#333;margin-bottom:5px;line-height:1.4}
+.meta-unidad{font-size:12px;color:#666;background:#f0f0f0;display:inline-block;padding:3px 10px;border-radius:4px}
+.meta-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-bottom:20px}
+.meta-años-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.meta-field label{display:block;font-size:13px;font-weight:500;color:#555;margin-bottom:6px}
+.meta-input{width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:6px;font-size:14px;transition:all .3s}
+.meta-input:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.1)}
+.meta-input.error{border-color:#dc3545}
+
+/* BUTTONS */
+.btn-container{display:flex;gap:15px;margin-top:30px;padding-top:30px;border-top:2px solid #e0e0e0}
+.btn{flex:1;padding:15px 30px;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn-primary{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(102,126,234,.4)}
+.btn-secondary{background:#f5f5f5;color:#333}
+.btn-secondary:hover{background:#e0e0e0}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
+
+/* LOADING & MESSAGES */
+.loading{display:none;text-align:center;padding:20px;color:#667eea}
+.loading.active{display:block}
+.spinner{border:4px solid #f3f3f3;border-top:4px solid #667eea;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 15px}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.message{padding:15px 20px;border-radius:8px;margin-top:20px;display:none}
+.message.success{background:#d4edda;color:#155724;border:1px solid #c3e6cb;display:block}
+.message.error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;display:block}
+.selection-alert{background:#fff3cd;border:1px solid #ffc107;color:#856404;padding:15px;border-radius:8px;margin-bottom:20px;display:none}
+.selection-alert.show{display:block}
+.help-text{font-size:13px;color:#666;margin-bottom:15px;padding:12px;background:#f8f9fa;border-radius:6px;border-left:3px solid #667eea;line-height:1.7}
+.download-link{display:inline-block;background:#28a745;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:10px}
+.download-link:hover{background:#218838}
+
+/* RESPONSIVE */
+@media(max-width:1200px){.selection-layout{grid-template-columns:1fr}}
+@media(max-width:768px){.two-column,.meta-form-grid{grid-template-columns:1fr}.form-container{padding:20px}.btn-container{flex-direction:column}.meta-años-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📄 Generador de Documentos PEI</h1>
+    <p>Plan Estratégico Institucional - Sistema Completo con Metas</p>
+  </div>
+
+  <div class="progress-steps">
+    <div class="step active" data-step="1"><div class="step-number">1</div><div class="step-label">Datos Generales</div></div>
+    <div class="step" data-step="2"><div class="step-number">2</div><div class="step-label">Seleccionar y Priorizar</div></div>
+    <div class="step" data-step="3"><div class="step-number">3</div><div class="step-label">Definir Metas</div></div>
+    <div class="step" data-step="4"><div class="step-number">4</div><div class="step-label">Generar Documento</div></div>
+  </div>
+
+  <div class="form-container">
+    <!-- PASO 1 -->
+    <div class="form-step active" data-step="1">
+      <div class="section">
+        <h2 class="section-title">Datos Generales del Municipio</h2>
+        <div class="two-column">
+          <div class="form-group">
+            <label>Código UE *</label>
+            <input type="text" id="codigo_ue" autocomplete="off" placeholder="Ej: 001234">
+            <div class="hint">Ingresa el código y presiona <strong>Enter</strong> para autocompletar desde el catálogo.</div>
+            <div class="hint" id="ueLookupMessage" role="status" aria-live="polite"></div>
+          </div>
+          <div class="form-group"><label>Período PEI *</label><input type="text" id="periodo_pei" required placeholder="Ej: 2027-2030"></div>
+        </div>
+        <div class="form-group"><label>Nombre del Municipio *</label><input type="text" id="nombre_municipio" placeholder="Ej: Municipalidad Provincial de Lima"></div>
+        <div class="two-column">
+          <div class="form-group"><label>Nombre de la Provincia *</label><input type="text" id="nombre_provincia" placeholder="Ej: Lima"></div>
+          <div class="form-group"><label>Nombre de la Región *</label><input type="text" id="nombre_region" placeholder="Ej: Lima"></div>
+        </div>
+        <div class="form-group"><label>Nombre del Alcalde *</label><input type="text" id="nombre_alcalde" placeholder="Ej: Juan Pérez García"></div>
+      </div>
+      <div class="section">
+        <h2 class="section-title">Documentos de Referencia</h2>
+        <div class="form-group"><label>Resolución de Alcaldía</label><input type="text" id="resolucion_alcaldia" placeholder="Ej: Resolución de Alcaldía N° 001-2024-MDL"></div>
+        <div class="form-group"><label>Plan de Desarrollo Concertado</label><input type="text" id="plan_desarrollo_concertado" placeholder="Ej: Plan de Desarrollo Concertado 2024-2030"></div>
+        <div class="form-group"><label>Número de Ordenanza PDC *</label><input type="text" id="ordenanza_pdc" required placeholder="Ej: 002-2024-MDL"></div>
+        <div class="form-group"><label>Política General de Gobierno</label><input type="text" id="politica_general_gobierno" placeholder="Ej: Política General de Gobierno al 2026"></div>
+        <div class="form-group"><label>Decreto de Política General de Gobierno</label><input type="text" id="decreto_politica_general_gobierno" placeholder="Ej: Decreto Supremo N° 164-2023-PCM"></div>
+      </div>
+      <div class="section">
+        <h2 class="section-title">Misión Institucional</h2>
+        <div class="form-group"><label>Misión Institucional *</label><textarea id="mision_institucional" placeholder="Describe la misión institucional del municipio..."></textarea></div>
+      </div>
+      <div class="btn-container">
+        <button type="button" class="btn btn-secondary" onclick="limpiarFormulario()">🔄 Limpiar</button>
+        <button type="button" class="btn btn-primary" onclick="irPaso1a2()">Siguiente: Seleccionar y Priorizar →</button>
+      </div>
+    </div>
+
+    <!-- PASO 2 -->
+    <div class="form-step" data-step="2">
+      <div class="section">
+        <h2 class="section-title">Selección y Priorización de OEI/AEI</h2>
+        <div class="help-text">
+          <strong>📌 Instrucciones:</strong><br>
+          <strong>Panel Izquierdo:</strong> Selecciona los OEI, sus indicadores y AEI<br>
+          <strong>Panel Derecho:</strong> Arrastra y suelta los OEI para priorizarlos (1 = mayor prioridad)<br>
+          • Haz clic en "Ver AEI" para priorizar las AEI dentro de cada OEI
+        </div>
+        <div class="selection-alert" id="selectionAlert">⚠️ Debes seleccionar al menos 1 OEI con sus indicadores y AEI antes de continuar.</div>
+        <div class="selection-layout">
+          <div class="selection-panel">
+            <div class="panel-title">📋 Seleccionar OEI/AEI</div>
+            <div class="panel-subtitle">Marca los OEI, indicadores y AEI que aplicarán a tu municipio</div>
+            <div id="oeiContainer" class="oei-grid"><div class="empty-state"><div class="spinner"></div><p>Cargando...</p></div></div>
+          </div>
+          <div class="selection-panel">
+            <div class="panel-title">🎯 Priorizar OEI <span class="counter-badge" id="priorityCount">0</span></div>
+            <div class="panel-subtitle">Arrastra los OEI para ordenarlos según prioridad (1 = más importante)</div>
+            <div id="priorityContainer" class="priority-list">
+              <div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">Los OEI que selecciones aparecerán aquí.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-container">
+        <button type="button" class="btn btn-secondary" onclick="irPaso(1)">← Volver a Datos Generales</button>
+        <button type="button" class="btn btn-primary" onclick="validarYContinuarAMetas()">Siguiente: Definir Metas →</button>
+      </div>
+    </div>
+
+    <!-- PASO 3 -->
+    <div class="form-step" data-step="3">
+      <div class="section">
+        <h2 class="section-title">Definición de Metas Anuales</h2>
+        <div class="help-text">
+          <strong>🎯 Instrucciones:</strong><br>
+          • Define las metas para cada indicador seleccionado<br>
+          • <strong>Año base:</strong> Año de referencia (ej: 2026) &nbsp;•&nbsp; <strong>Valor base:</strong> Valor actual del indicador<br>
+          • <strong>Metas anuales:</strong> Valores objetivo para cada año del período PEI
+        </div>
+        <div class="selection-alert" id="metasAlert">⚠️ Por favor, completa todos los campos de metas antes de continuar.</div>
+        <div id="metasContainer" class="metas-container"></div>
+      </div>
+      <div class="btn-container">
+        <button type="button" class="btn btn-secondary" onclick="irPaso(2)">← Volver a Selección/Priorización</button>
+        <button type="button" class="btn btn-primary" onclick="validarMetasYContinuar()">Siguiente: Generar Documento →</button>
+      </div>
+    </div>
+
+    <!-- PASO 4 -->
+    <div class="form-step" data-step="4">
+      <div class="section">
+        <h2 class="section-title">Generar Documento PEI</h2>
+        <div class="help-text">
+          <strong>📄 Resumen de tu PEI:</strong><br>
+          • <span id="resumenOEI">0 OEI seleccionados</span><br>
+          • <span id="resumenAEI">0 AEI seleccionadas</span><br>
+          • <span id="resumenIndicadores">0 indicadores totales</span><br>
+          • <span id="resumenMetas">0 indicadores con metas definidas</span>
+        </div>
+        <div id="instruccionesServidor" style="margin-top:20px;padding:15px;background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;font-size:13px;line-height:1.7;color:#155724">
+          <strong>✅ Servidor activo en localhost:8000</strong><br>
+          Haz clic en "Generar Documento Word" para crear el archivo .docx en tu carpeta del proyecto.
+        </div>
+      </div>
+      <div class="btn-container">
+        <button type="button" class="btn btn-secondary" onclick="irPaso(3)">← Volver a Metas</button>
+        <button type="button" class="btn btn-primary" id="btnGenerar" onclick="generarDocumento()">✨ Generar Documento Word</button>
+      </div>
+      <div id="message" class="message"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// MATRIZ ESTÁNDAR EMBEBIDA (sin fetch)
+// ============================================
+let MATRIZ_ESTANDAR = { oei: [] };
+
+// ============================================
+// ESTADO DE LA APP (en memoria, sin almacenamiento externo)
+// ============================================
+const appState = {
+  datos: {},
+  metas: {},
+  periodo_pei: null,
+  selecciones: { oei: [], indicadoresOEI: [], aei: [], indicadoresAEI: [] },
+  prioridades: { oei: [], aei: {} }
+};
+
+let pasoActual = 1;
+let draggedElement = null;
+let draggedAEIElement = null;
+const API_BASE_URL = String(window.PEI_API_BASE_URL || '').replace(/\/+$/, '');
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
+function configurarAutocompletadoUE() {
+  const input = document.getElementById('codigo_ue');
+  const message = document.getElementById('ueLookupMessage');
+  if (!input) return;
+
+  input.addEventListener('keydown', async event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const codigo = input.value.trim();
+    if (!codigo) return;
+    if (message) message.textContent = 'Consultando catálogo...';
+
+    try {
+      const response = await fetch(apiUrl(`/api/ue/${encodeURIComponent(codigo)}`), {
+        headers: { Accept: 'application/json' }
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error?.message || 'Código UE no encontrado en el catálogo.');
+      }
+
+      const data = result.data;
+      const fields = {
+        nombre_municipio: data.nombre_municipio,
+        nombre_provincia: data.nombre_provincia,
+        nombre_region: data.nombre_region,
+        periodo_pei: data.periodo_pei
+      };
+      Object.entries(fields).forEach(([id, value]) => {
+        const field = document.getElementById(id);
+        if (field && value) field.value = value;
+      });
+      sincronizarPeriodo();
+      if (message) message.textContent = 'Datos de la UE completados.';
+    } catch (error) {
+      if (message) message.textContent = error.message;
+    }
+  });
+}
+
+function agregarSeleccion(lista, id) {
+  if (!lista.includes(id)) lista.push(id);
+}
+
+function obtenerCodigosAEIPorOEI(codigoOEI) {
+  const oei = MATRIZ_ESTANDAR.oei.find(item => item.codigo === codigoOEI);
+  return oei ? oei.aei.map(aei => aei.codigo) : [];
+}
+
+function quitarMetasPorPrefijo(prefijo) {
+  Object.keys(appState.metas).forEach(id => {
+    if (id.startsWith(prefijo)) delete appState.metas[id];
+  });
+}
+
+function quitarAEISeleccion(codigoOEI, codigoAEI) {
+  const aeiId = `aei-${codigoAEI}`;
+  appState.selecciones.aei = appState.selecciones.aei.filter(id => id !== aeiId);
+  appState.selecciones.indicadoresAEI = appState.selecciones.indicadoresAEI
+    .filter(id => !id.startsWith(`ind-aei-${codigoAEI}-`));
+  appState.prioridades.aei[codigoOEI] = (appState.prioridades.aei[codigoOEI] || [])
+    .filter(codigo => codigo !== codigoAEI);
+  quitarMetasPorPrefijo(`ind-aei-${codigoAEI}-`);
+}
+
+function quitarOEISeleccion(codigoOEI) {
+  const oeiId = `oei-${codigoOEI}`;
+  const aeiCodes = obtenerCodigosAEIPorOEI(codigoOEI);
+  const aeiIds = new Set(aeiCodes.map(codigo => `aei-${codigo}`));
+  appState.selecciones.oei = appState.selecciones.oei.filter(id => id !== oeiId);
+  appState.selecciones.aei = appState.selecciones.aei.filter(id => !aeiIds.has(id));
+  appState.selecciones.indicadoresOEI = appState.selecciones.indicadoresOEI
+    .filter(id => !id.startsWith(`ind-oei-${codigoOEI}-`));
+  appState.selecciones.indicadoresAEI = appState.selecciones.indicadoresAEI
+    .filter(id => !aeiCodes.some(codigo => id.startsWith(`ind-aei-${codigo}-`)));
+  quitarMetasPorPrefijo(`ind-oei-${codigoOEI}-`);
+  aeiCodes.forEach(codigo => quitarMetasPorPrefijo(`ind-aei-${codigo}-`));
+}
+
+function valoresUnicosValidos(valores, validos) {
+  if (!Array.isArray(valores)) return [];
+  return [...new Set(valores.filter(id => typeof id === 'string' && validos.has(id)))];
+}
+
+function extraerAniosPeriodo(periodo) {
+  const match = String(periodo || '').match(/^\s*(\d{4})\s*[-–—]\s*(\d{4})\s*$/);
+  if (!match) return [];
+  const inicio = Number(match[1]);
+  const fin = Number(match[2]);
+  if (inicio > fin) return [];
+  return Array.from({ length: fin - inicio + 1 }, (_, index) => inicio + index);
+}
+
+function obtenerPeriodoPei() {
+  return document.getElementById('periodo_pei')?.value.trim() || '';
+}
+
+function sincronizarPeriodo() {
+  const periodo = obtenerPeriodoPei();
+  if (appState.periodo_pei !== null && appState.periodo_pei !== periodo) {
+    appState.metas = {};
+  }
+  appState.periodo_pei = periodo;
+  return extraerAniosPeriodo(periodo);
+}
+
+function filtrarMetas(metas, anios, indicadoresSeleccionados) {
+  const allowedFields = new Set(['año_base', 'anio_base', 'valor_base']);
+  anios.forEach(year => allowedFields.add(`meta_${year}`));
+  const clean = {};
+  if (!metas || typeof metas !== 'object' || Array.isArray(metas)) return clean;
+  Object.entries(metas).forEach(([id, value]) => {
+    if (!indicadoresSeleccionados.has(id) || !value || typeof value !== 'object' || Array.isArray(value)) return;
+    clean[id] = Object.fromEntries(
+      Object.entries(value)
+        .filter(([field]) => allowedFields.has(field))
+        .map(([field, fieldValue]) => [field, normalizarValorMeta(field, fieldValue)])
+    );
+  });
+  return clean;
+}
+
+function normalizarEstadoGuardado(data) {
+  const saved = data && typeof data === 'object' ? data : {};
+  const rawSelecciones = saved.selecciones && typeof saved.selecciones === 'object' ? saved.selecciones : {};
+  const oeiIds = new Set(MATRIZ_ESTANDAR.oei.map(oei => `oei-${oei.codigo}`));
+  const aeiIds = new Set();
+  const indicadoresOEI = new Set();
+  const indicadoresAEI = new Set();
+  const indicadorAEIPadre = new Map();
+  const aeiPadre = new Map();
+
+  MATRIZ_ESTANDAR.oei.forEach(oei => {
+    oei.indicadores.forEach((_, index) => indicadoresOEI.add(`ind-oei-${oei.codigo}-${index}`));
+    oei.aei.forEach(aei => {
+      const aeiId = `aei-${aei.codigo}`;
+      aeiIds.add(aeiId);
+      aeiPadre.set(aeiId, oei.codigo);
+      aei.indicadores.forEach((_, index) => {
+        const id = `ind-aei-${aei.codigo}-${index}`;
+        indicadoresAEI.add(id);
+        indicadorAEIPadre.set(id, aeiId);
+      });
+    });
+  });
+
+  const selecciones = {
+    oei: valoresUnicosValidos(rawSelecciones.oei, oeiIds),
+    indicadoresOEI: valoresUnicosValidos(rawSelecciones.indicadoresOEI, indicadoresOEI),
+    aei: valoresUnicosValidos(rawSelecciones.aei, aeiIds),
+    indicadoresAEI: valoresUnicosValidos(rawSelecciones.indicadoresAEI, indicadoresAEI)
+  };
+
+  selecciones.aei.forEach(id => {
+    const codigoOEI = aeiPadre.get(id);
+    if (codigoOEI) agregarSeleccion(selecciones.oei, `oei-${codigoOEI}`);
+  });
+  selecciones.indicadoresOEI.forEach(id => {
+    const codigoOEI = id.match(/^ind-oei-(OEI\.\d+)-\d+$/)?.[1];
+    if (codigoOEI) agregarSeleccion(selecciones.oei, `oei-${codigoOEI}`);
+  });
+  selecciones.indicadoresAEI = selecciones.indicadoresAEI.filter(id => selecciones.aei.includes(indicadorAEIPadre.get(id)));
+
+  const selectedOeiCodes = new Set(selecciones.oei.map(id => id.replace('oei-', '')));
+  const selectedAeiByOei = new Map();
+  selecciones.aei.forEach(id => {
+    const codigoOEI = aeiPadre.get(id);
+    if (!selectedAeiByOei.has(codigoOEI)) selectedAeiByOei.set(codigoOEI, new Set());
+    selectedAeiByOei.get(codigoOEI).add(id.replace('aei-', ''));
+  });
+
+  const rawPrioridades = saved.prioridades && typeof saved.prioridades === 'object' ? saved.prioridades : {};
+  const prioridades = { oei: [], aei: {} };
+  const rawOeiOrder = Array.isArray(rawPrioridades.oei) ? rawPrioridades.oei : [];
+  [...new Set(rawOeiOrder)].forEach(codigo => {
+    if (typeof codigo === 'string' && selectedOeiCodes.has(codigo)) prioridades.oei.push(codigo);
+  });
+  MATRIZ_ESTANDAR.oei.forEach(oei => {
+    if (selectedOeiCodes.has(oei.codigo) && !prioridades.oei.includes(oei.codigo)) prioridades.oei.push(oei.codigo);
+  });
+  prioridades.oei.forEach(codigoOEI => {
+    const selectedCodes = selectedAeiByOei.get(codigoOEI) || new Set();
+    const rawOrder = Array.isArray(rawPrioridades.aei?.[codigoOEI]) ? rawPrioridades.aei[codigoOEI] : [];
+    const order = [];
+    rawOrder.forEach(codigo => {
+      if (typeof codigo === 'string' && selectedCodes.has(codigo) && !order.includes(codigo)) order.push(codigo);
+    });
+    obtenerCodigosAEIPorOEI(codigoOEI).forEach(codigo => {
+      if (selectedCodes.has(codigo) && !order.includes(codigo)) order.push(codigo);
+    });
+    prioridades.aei[codigoOEI] = order;
+  });
+
+  const periodo_pei = typeof saved.periodo_pei === 'string' ? saved.periodo_pei.trim() : '';
+  const selectedIndicators = new Set([...selecciones.indicadoresOEI, ...selecciones.indicadoresAEI]);
+  const metas = filtrarMetas(saved.metas, extraerAniosPeriodo(periodo_pei), selectedIndicators);
+
+  return { selecciones, prioridades, metas, periodo_pei };
+}
+
+async function cargarMatrizEstandar() {
+  try {
+    const response = await fetch(apiUrl('/matriz_estandar.json'), {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const matriz = await response.json();
+    if (!matriz || !Array.isArray(matriz.oei)) {
+      throw new Error('Formato inválido de la matriz estándar.');
+    }
+    MATRIZ_ESTANDAR = matriz;
+    renderizarOEIs();
+    restaurarDatosGuardados();
+  } catch (error) {
+    const container = document.getElementById('oeiContainer');
+    if (container) {
+      container.innerHTML = `<div class="message error">No se pudo cargar la matriz estándar: ${error.message}</div>`;
+    }
+    console.error('Error al cargar la matriz estándar:', error);
+  }
+}
+
+window.addEventListener('load', () => {
+  configurarAutocompletadoUE();
+  cargarMatrizEstandar();
+});
+
+// ============================================
+// RENDERIZADO OEI
+// ============================================
+function renderizarOEIs() {
+  const container = document.getElementById('oeiContainer');
+  container.innerHTML = '';
+  MATRIZ_ESTANDAR.oei.forEach(oei => container.appendChild(crearOEICard(oei)));
+}
+
+function crearOEICard(oei) {
+  const card = document.createElement('div');
+  card.className = 'oei-card';
+  card.dataset.codigo = oei.codigo;
+
+  card.innerHTML = `
+    <div class="oei-header" onclick="toggleOEIExpand('${oei.codigo}')">
+      <input type="checkbox" class="oei-checkbox" id="oei-${oei.codigo}"
+             onclick="event.stopPropagation(); toggleOEISelection('${oei.codigo}')">
+      <div class="oei-info">
+        <div class="oei-code">${oei.codigo}</div>
+        <div class="oei-title">${oei.denominacion}</div>
+        <div style="margin-top:6px;font-size:11px;color:#666">
+          ${oei.indicadores.length} ind. OEI &bull; ${oei.aei.length} AEI
+        </div>
+      </div>
+      <div class="oei-expand-icon">▼</div>
+    </div>
+    <div class="oei-details">
+      ${crearSeccionIndicadoresOEI(oei)}
+      ${crearSeccionAEI(oei)}
+    </div>`;
+  return card;
+}
+
+function crearSeccionIndicadoresOEI(oei) {
+  let html = '<div class="subsection-title">Indicadores del OEI</div>';
+  oei.indicadores.forEach((ind, i) => {
+    html += `<div class="indicator-item">
+      <input type="checkbox" class="indicator-checkbox" id="ind-oei-${oei.codigo}-${i}"
+             data-oei="${oei.codigo}" data-tipo="oei" data-index="${i}"
+             onchange="toggleIndicador(this)">
+      <label for="ind-oei-${oei.codigo}-${i}" class="indicator-text">
+        ${ind.nombre} <span class="indicator-unit">${ind.unidad}</span>
+      </label>
+    </div>`;
+  });
+  return html;
+}
+
+function crearSeccionAEI(oei) {
+  let html = `<div class="subsection-title" style="margin-top:15px">Acciones Estratégicas (AEI) <span class="counter-badge" style="background:#764ba2">${oei.aei.length}</span></div>`;
+  oei.aei.forEach(aei => {
+    html += `<div class="aei-item" id="aei-item-${aei.codigo}">
+      <input type="checkbox" class="aei-checkbox" id="aei-${aei.codigo}"
+             data-oei="${oei.codigo}" data-codigo="${aei.codigo}"
+             onchange="toggleAEI('${oei.codigo}','${aei.codigo}')">
+      <div style="flex:1">
+        <div class="aei-code">${aei.codigo}</div>
+        <div class="indicator-text">${aei.denominacion}</div>
+        <div class="aei-details-panel" id="aei-details-${aei.codigo}">
+          ${crearIndicadoresAEI(oei.codigo, aei)}
+        </div>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+function crearIndicadoresAEI(codigoOEI, aei) {
+  let html = '<div class="subsection-title" style="font-size:12px;margin-top:8px">Indicadores de la AEI</div>';
+  aei.indicadores.forEach((ind, i) => {
+    html += `<div class="indicator-item">
+      <input type="checkbox" class="indicator-checkbox" id="ind-aei-${aei.codigo}-${i}"
+             data-oei="${codigoOEI}" data-aei="${aei.codigo}" data-tipo="aei" data-index="${i}"
+             onchange="toggleIndicador(this)">
+      <label for="ind-aei-${aei.codigo}-${i}" class="indicator-text">
+        ${ind.nombre} <span class="indicator-unit">${ind.unidad}</span>
+      </label>
+    </div>`;
+  });
+  return html;
+}
+
+// ============================================
+// INTERACCIONES OEI
+// ============================================
+function toggleOEIExpand(codigo) {
+  document.querySelector(`.oei-card[data-codigo="${codigo}"]`).classList.toggle('expanded');
+}
+
+function toggleOEISelection(codigo) {
+  const checkbox = document.getElementById(`oei-${codigo}`);
+  const card = document.querySelector(`.oei-card[data-codigo="${codigo}"]`);
+  if (!checkbox || !card) return;
+
+  if (checkbox.checked) {
+    agregarSeleccion(appState.selecciones.oei, `oei-${codigo}`);
+    card.classList.add('selected', 'expanded');
+    agregarOEIAPrioridad(codigo);
+  } else {
+    card.classList.remove('selected');
+    // Desmarcar todos los checkboxes hijos sin llamar toggleOEISelection de nuevo
+    card.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      if (cb !== checkbox) cb.checked = false;
+    });
+    // Ocultar paneles AEI
+    card.querySelectorAll('.aei-details-panel').forEach(p => p.style.display = 'none');
+    card.querySelectorAll('.aei-item').forEach(i => i.classList.remove('selected'));
+    quitarOEISeleccion(codigo);
+    quitarOEIDePrioridad(codigo);
+  }
+  guardarDatos();
+}
+
+function asegurarOEIPadre(codigoOEI) {
+  const checkbox = document.getElementById(`oei-${codigoOEI}`);
+  const card = document.querySelector(`.oei-card[data-codigo="${codigoOEI}"]`);
+  if (!checkbox || !card || checkbox.checked) return;
+
+  checkbox.checked = true;
+  agregarSeleccion(appState.selecciones.oei, `oei-${codigoOEI}`);
+  card.classList.add('selected', 'expanded');
+  agregarOEIAPrioridad(codigoOEI);
+}
+
+function toggleAEI(codigoOEI, codigoAEI) {
+  const checkbox = document.getElementById(`aei-${codigoAEI}`);
+  const details = document.getElementById(`aei-details-${codigoAEI}`);
+  const aeiItem = document.getElementById(`aei-item-${codigoAEI}`);
+  if (!checkbox || !details || !aeiItem) return;
+
+  if (checkbox.checked) {
+    asegurarOEIPadre(codigoOEI);
+    agregarSeleccion(appState.selecciones.aei, `aei-${codigoAEI}`);
+    details.style.display = 'block';
+    aeiItem.classList.add('selected');
+  } else {
+    details.style.display = 'none';
+    aeiItem.classList.remove('selected');
+    details.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    quitarAEISeleccion(codigoOEI, codigoAEI);
+  }
+  actualizarAEIEnPrioridad(codigoOEI);
+  guardarDatos();
+}
+
+function toggleIndicador(checkbox) {
+  if (!checkbox) return;
+  const codigoOEI = checkbox.dataset.oei;
+
+  if (checkbox.checked) {
+    asegurarOEIPadre(codigoOEI);
+    if (checkbox.dataset.tipo === 'aei') {
+      const codigoAEI = checkbox.dataset.aei;
+      const aeiCheckbox = document.getElementById(`aei-${codigoAEI}`);
+      if (aeiCheckbox && !aeiCheckbox.checked) {
+        aeiCheckbox.checked = true;
+        toggleAEI(codigoOEI, codigoAEI);
+      }
+    }
+    agregarSeleccion(
+      checkbox.dataset.tipo === 'aei' ? appState.selecciones.indicadoresAEI : appState.selecciones.indicadoresOEI,
+      checkbox.id
+    );
+  } else {
+    const selecciones = checkbox.dataset.tipo === 'aei'
+      ? appState.selecciones.indicadoresAEI
+      : appState.selecciones.indicadoresOEI;
+    const index = selecciones.indexOf(checkbox.id);
+    if (index !== -1) selecciones.splice(index, 1);
+    delete appState.metas[checkbox.id];
+  }
+
+  actualizarAEIEnPrioridad(codigoOEI);
+  guardarDatos();
+}
+
+// ============================================
+// GESTIÓN DE PRIORIDADES
+// ============================================
+function agregarOEIAPrioridad(codigo) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigo);
+  if (!oei) return;
+  agregarSeleccion(appState.prioridades.oei, codigo);
+  if (!appState.prioridades.aei[codigo]) appState.prioridades.aei[codigo] = [];
+  const container = document.getElementById('priorityContainer');
+  if (container.querySelector(`.priority-item[data-codigo="${codigo}"]`)) return;
+  const empty = container.querySelector('.empty-state');
+  if (empty) empty.remove();
+  container.appendChild(crearPriorityItem(oei));
+  habilitarDragAndDrop();
+  actualizarNumerosPrioridad();
+  actualizarContadorPrioridad();
+}
+
+function crearPriorityItem(oei) {
+  const div = document.createElement('div');
+  div.className = 'priority-item';
+  div.dataset.codigo = oei.codigo;
+  div.draggable = true;
+  div.innerHTML = `
+    <div class="priority-number"></div>
+    <button class="remove-btn" onclick="eliminarOEIDePrioridad('${oei.codigo}')" title="Eliminar">✕</button>
+    <div class="priority-header">
+      <div class="drag-handle">⋮⋮</div>
+      <div style="flex:1">
+        <div class="priority-code">${oei.codigo}</div>
+        <div class="priority-title">${oei.denominacion}</div>
+        <div class="priority-stats" id="stats-${oei.codigo}">
+          <div class="priority-stat">📊 0 indicadores</div>
+          <div class="priority-stat">📋 0 AEI</div>
+        </div>
+      </div>
+    </div>
+    <button class="expand-aei-btn" onclick="toggleAEIPriority('${oei.codigo}')">Ver AEI para priorizar ▼</button>
+    <div class="aei-priority-list" id="aei-priority-${oei.codigo}"></div>`;
+  return div;
+}
+
+function eliminarOEIDePrioridad(codigo) {
+  const checkbox = document.getElementById(`oei-${codigo}`);
+  if (checkbox && checkbox.checked) {
+    checkbox.checked = false;
+    toggleOEISelection(codigo);
+    return;
+  }
+  quitarOEIDePrioridad(codigo);
+  guardarDatos();
+}
+
+function quitarOEIDePrioridad(codigo) {
+  appState.prioridades.oei = appState.prioridades.oei.filter(item => item !== codigo);
+  delete appState.prioridades.aei[codigo];
+  const priorityItem = document.querySelector(`.priority-item[data-codigo="${codigo}"]`);
+  if (priorityItem) priorityItem.remove();
+  actualizarNumerosPrioridad();
+  actualizarContadorPrioridad();
+  verificarPriorityEmpty();
+}
+
+function verificarPriorityEmpty() {
+  const container = document.getElementById('priorityContainer');
+  if (container.querySelectorAll('.priority-item').length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">Los OEI que selecciones aparecerán aquí.</div></div>`;
+  }
+}
+
+function actualizarAEIEnPrioridad(codigoOEI) {
+  const stats = document.getElementById(`stats-${codigoOEI}`);
+  if (!stats) return;
+  const numInd = appState.selecciones.indicadoresOEI.filter(id => id.startsWith(`ind-oei-${codigoOEI}-`)).length
+    + appState.selecciones.indicadoresAEI.filter(id => {
+      const codigoAEI = id.match(/^ind-aei-(AEI\.\d+\.\d+)-\d+$/)?.[1];
+      return obtenerCodigosAEIPorOEI(codigoOEI).includes(codigoAEI);
+    }).length;
+  const numAEI = appState.selecciones.aei.filter(id => {
+    const codigoAEI = id.replace('aei-', '');
+    return obtenerCodigosAEIPorOEI(codigoOEI).includes(codigoAEI);
+  }).length;
+  stats.innerHTML = `<div class="priority-stat">📊 ${numInd} indicadores</div><div class="priority-stat">📋 ${numAEI} AEI</div>`;
+  // Refrescar lista AEI si está expandida
+  const pItem = document.querySelector(`.priority-item[data-codigo="${codigoOEI}"]`);
+  if (pItem && pItem.classList.contains('expanded')) {
+    const aeiList = document.getElementById(`aei-priority-${codigoOEI}`);
+    aeiList.innerHTML = crearListaAEIPrioridad(codigoOEI);
+    habilitarDragAndDropAEI();
+  }
+}
+
+function toggleAEIPriority(codigoOEI) {
+  const pItem = document.querySelector(`.priority-item[data-codigo="${codigoOEI}"]`);
+  const btn = pItem.querySelector('.expand-aei-btn');
+  const aeiList = document.getElementById(`aei-priority-${codigoOEI}`);
+  pItem.classList.toggle('expanded');
+  if (pItem.classList.contains('expanded')) {
+    btn.textContent = 'Ocultar AEI ▲';
+    aeiList.innerHTML = crearListaAEIPrioridad(codigoOEI);
+    habilitarDragAndDropAEI();
+  } else {
+    btn.textContent = 'Ver AEI para priorizar ▼';
+  }
+}
+
+function crearListaAEIPrioridad(codigoOEI, ordenPrioridad = []) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigoOEI);
+  const aeiSel = oei ? oei.aei.filter(a => {
+    return appState.selecciones.aei.includes(`aei-${a.codigo}`);
+  }) : [];
+  const ordenGuardado = ordenPrioridad.length > 0 ? ordenPrioridad : (appState.prioridades.aei[codigoOEI] || []);
+  if (ordenGuardado.length > 0) {
+    const posiciones = new Map(ordenGuardado.map((codigo, index) => [codigo, index]));
+    aeiSel.sort((a, b) => {
+      const posicionA = posiciones.has(a.codigo) ? posiciones.get(a.codigo) : Number.MAX_SAFE_INTEGER;
+      const posicionB = posiciones.has(b.codigo) ? posiciones.get(b.codigo) : Number.MAX_SAFE_INTEGER;
+      return posicionA - posicionB;
+    });
+  }
+  if (!aeiSel.length) return '<div style="text-align:center;padding:15px;color:#999;font-size:12px">No hay AEI seleccionadas</div>';
+  let html = '<div style="font-size:12px;font-weight:600;margin-bottom:10px;color:#764ba2">Arrastra para priorizar:</div><div class="aei-sortable">';
+  aeiSel.forEach((aei, i) => {
+    html += `<div class="aei-priority-item" data-codigo="${aei.codigo}" draggable="true">
+      <div class="aei-priority-number">${i+1}</div>
+      <div class="aei-priority-code">${aei.codigo}</div>
+      <div class="aei-priority-title">${aei.denominacion}</div>
+    </div>`;
+  });
+  return html + '</div>';
+}
+
+function actualizarNumerosPrioridad() {
+  document.querySelectorAll('.priority-item').forEach((item, i) => {
+    item.querySelector('.priority-number').textContent = i + 1;
+  });
+  sincronizarPrioridadesDesdeUI();
+}
+
+function actualizarContadorPrioridad() {
+  document.getElementById('priorityCount').textContent = document.querySelectorAll('.priority-item').length;
+}
+
+function actualizarEstadoPrioridades() {
+  appState.prioridades = obtenerPrioridadesDesdeEstado();
+}
+
+function obtenerPrioridadesDesdeEstado() {
+  const selectedOei = new Set(appState.selecciones.oei.map(id => id.replace('oei-', '')));
+  const oeiOrder = appState.prioridades.oei.filter(codigo => selectedOei.has(codigo));
+  MATRIZ_ESTANDAR.oei.forEach(oei => {
+    if (selectedOei.has(oei.codigo) && !oeiOrder.includes(oei.codigo)) oeiOrder.push(oei.codigo);
+  });
+
+  const aeiOrder = {};
+  oeiOrder.forEach(codigoOEI => {
+    const selectedAEI = new Set(
+      appState.selecciones.aei
+        .filter(id => obtenerCodigosAEIPorOEI(codigoOEI).includes(id.replace('aei-', '')))
+        .map(id => id.replace('aei-', ''))
+    );
+    const savedOrder = appState.prioridades.aei[codigoOEI] || [];
+    aeiOrder[codigoOEI] = [
+      ...savedOrder.filter(codigo => selectedAEI.has(codigo)),
+      ...obtenerCodigosAEIPorOEI(codigoOEI).filter(codigo => selectedAEI.has(codigo) && !savedOrder.includes(codigo))
+    ];
+  });
+
+  return { oei: oeiOrder, aei: aeiOrder };
+}
+
+function sincronizarPrioridadesDesdeUI() {
+  const oeiOrder = Array.from(document.querySelectorAll('.priority-item')).map(item => item.dataset.codigo);
+  const aeiOrder = { ...appState.prioridades.aei };
+  oeiOrder.forEach(codigoOEI => {
+    const priorityItem = document.querySelector(`.priority-item[data-codigo="${codigoOEI}"]`);
+    const domOrder = priorityItem
+      ? Array.from(priorityItem.querySelectorAll('.aei-priority-item')).map(item => item.dataset.codigo)
+      : [];
+    const savedOrder = appState.prioridades.aei[codigoOEI] || [];
+    aeiOrder[codigoOEI] = priorityItem?.classList.contains('expanded') ? domOrder : savedOrder;
+  });
+  appState.prioridades = { oei: oeiOrder, aei: aeiOrder };
+  actualizarEstadoPrioridades();
+}
+
+function guardarDatos() {
+  localStorage.setItem('peiFormData', JSON.stringify(construirPayload()));
+}
+
+// ============================================
+// DRAG & DROP OEI
+// ============================================
+function habilitarDragAndDrop() {
+  document.querySelectorAll('.priority-item').forEach(item => {
+    item.removeEventListener('dragstart', handleDragStart);
+    item.removeEventListener('dragover', handleDragOver);
+    item.removeEventListener('drop', handleDrop);
+    item.removeEventListener('dragend', handleDragEnd);
+    item.removeEventListener('dragenter', handleDragEnter);
+    item.removeEventListener('dragleave', handleDragLeave);
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragover', handleDragOver);
+    item.addEventListener('drop', handleDrop);
+    item.addEventListener('dragend', handleDragEnd);
+    item.addEventListener('dragenter', handleDragEnter);
+    item.addEventListener('dragleave', handleDragLeave);
+  });
+}
+
+function handleDragStart(e) { draggedElement = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+function handleDragEnter(e) { if (this !== draggedElement) this.classList.add('drag-over'); }
+function handleDragLeave(e) { this.classList.remove('drag-over'); }
+function handleDragEnd(e) { this.classList.remove('dragging'); document.querySelectorAll('.priority-item').forEach(i => i.classList.remove('drag-over')); }
+function handleDrop(e) {
+  e.stopPropagation();
+  if (draggedElement !== this) {
+    const container = document.getElementById('priorityContainer');
+    const items = Array.from(container.children);
+    const di = items.indexOf(draggedElement), ti = items.indexOf(this);
+    container.insertBefore(draggedElement, di < ti ? this.nextSibling : this);
+    actualizarNumerosPrioridad();
+    guardarDatos();
+  }
+  return false;
+}
+
+// ============================================
+// DRAG & DROP AEI
+// ============================================
+function habilitarDragAndDropAEI() {
+  document.querySelectorAll('.aei-priority-item').forEach(item => {
+    item.removeEventListener('dragstart', handleAEIDragStart);
+    item.removeEventListener('dragover', handleAEIDragOver);
+    item.removeEventListener('drop', handleAEIDrop);
+    item.removeEventListener('dragend', handleAEIDragEnd);
+    item.addEventListener('dragstart', handleAEIDragStart);
+    item.addEventListener('dragover', handleAEIDragOver);
+    item.addEventListener('drop', handleAEIDrop);
+    item.addEventListener('dragend', handleAEIDragEnd);
+  });
+}
+
+function handleAEIDragStart(e) { draggedAEIElement = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function handleAEIDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+function handleAEIDragEnd(e) { this.classList.remove('dragging'); }
+function handleAEIDrop(e) {
+  e.stopPropagation();
+  if (draggedAEIElement !== this && draggedAEIElement.parentNode === this.parentNode) {
+    const container = this.parentNode;
+    const items = Array.from(container.children);
+    const di = items.indexOf(draggedAEIElement), ti = items.indexOf(this);
+    container.insertBefore(draggedAEIElement, di < ti ? this.nextSibling : this);
+    actualizarNumerosAEI(container);
+    const codigoOEI = container.closest('.priority-item')?.dataset.codigo;
+    if (codigoOEI) {
+      appState.prioridades.aei[codigoOEI] = Array.from(container.children).map(item => item.dataset.codigo);
+    }
+    actualizarEstadoPrioridades();
+    guardarDatos();
+  }
+  return false;
+}
+
+function actualizarNumerosAEI(container) {
+  container.querySelectorAll('.aei-priority-item').forEach((item, index) => {
+    item.querySelector('.aei-priority-number').textContent = index + 1;
+  });
+}
+
+// ============================================
+// METAS (PASO 3)
+// ============================================
+function renderizarMetasIndicadores() {
+  const container = document.getElementById('metasContainer');
+  container.innerHTML = '';
+  const priorityItems = document.querySelectorAll('.priority-item');
+  if (!priorityItems.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-text">No hay indicadores seleccionados.<br>Regresa al Paso 2.</div></div>';
+    return;
+  }
+  priorityItems.forEach((item, i) => {
+    const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === item.dataset.codigo);
+    if (oei) container.appendChild(crearSeccionMetasOEI(oei, i + 1));
+  });
+}
+
+function crearSeccionMetasOEI(oei, prioridad) {
+  const section = document.createElement('div');
+  section.className = 'metas-oei-section';
+  const indOEI = getIndicadoresOEISeleccionados(oei.codigo);
+  const indAEI = getIndicadoresAEISeleccionados(oei.codigo);
+  section.innerHTML = `
+    <div class="metas-oei-header">
+      <div class="metas-oei-priority">Prioridad ${prioridad}</div>
+      <div class="metas-oei-title">${oei.codigo}: ${oei.denominacion}</div>
+    </div>
+    <div class="metas-indicadores-container">
+      ${indOEI.length ? '<div class="metas-tipo-header">📊 Indicadores del OEI</div>' + indOEI.map(crearFormularioMeta).join('') : ''}
+      ${indAEI.length ? '<div class="metas-tipo-header">📋 Indicadores de las AEI</div>' + agruparPorAEI(indAEI) : ''}
+    </div>`;
+  return section;
+}
+
+function getIndicadoresOEISeleccionados(codigoOEI) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigoOEI);
+  if (!oei) return [];
+  return oei.indicadores.map((ind, i) => {
+    const cb = document.getElementById(`ind-oei-${codigoOEI}-${i}`);
+    return (cb && cb.checked) ? { id: `ind-oei-${codigoOEI}-${i}`, nombre: ind.nombre, unidad: ind.unidad } : null;
+  }).filter(Boolean);
+}
+
+function getIndicadoresAEISeleccionados(codigoOEI) {
+  const oei = MATRIZ_ESTANDAR.oei.find(o => o.codigo === codigoOEI);
+  if (!oei) return [];
+  const result = [];
+  oei.aei.forEach(aei => {
+    const aeiCb = document.getElementById(`aei-${aei.codigo}`);
+    if (!(aeiCb && aeiCb.checked)) return;
+    aei.indicadores.forEach((ind, i) => {
+      const cb = document.getElementById(`ind-aei-${aei.codigo}-${i}`);
+      if (cb && cb.checked) result.push({ id: `ind-aei-${aei.codigo}-${i}`, nombre: ind.nombre, unidad: ind.unidad, codigoAEI: aei.codigo, denominacionAEI: aei.denominacion });
+    });
+  });
+  return result;
+}
+
+function agruparPorAEI(indicadores) {
+  const grupos = {};
+  indicadores.forEach(ind => {
+    if (!grupos[ind.codigoAEI]) grupos[ind.codigoAEI] = { denominacion: ind.denominacionAEI, indicadores: [] };
+    grupos[ind.codigoAEI].indicadores.push(ind);
+  });
+  return Object.entries(grupos).map(([cod, g]) =>
+    `<div class="metas-aei-subtitle">${cod}: ${g.denominacion}</div>` + g.indicadores.map(crearFormularioMeta).join('')
+  ).join('');
+}
+
+function obtenerAnios() {
+  return extraerAniosPeriodo(obtenerPeriodoPei());
+}
+
+function esCampoValorMeta(campo) {
+  return campo === 'valor_base' || /^meta_\d{4}$/.test(campo);
+}
+
+function normalizarValorMeta(campo, valor) {
+  if (valor === null || valor === undefined) return '';
+  if (typeof valor === 'string' && valor.trim() === '') return '';
+
+  const numero = typeof valor === 'number' ? valor : Number(String(valor).trim());
+  if (!Number.isFinite(numero)) return '';
+  return esCampoValorMeta(campo) ? Math.max(0, numero) : numero;
+}
+
+function normalizarMetaInput(input) {
+  if (!input) return;
+  const match = input.id.match(/^(.*)-(meta_\d{4}|año_base|valor_base)$/);
+  if (!match) return;
+  const normalizado = guardarMeta(match[1], match[2], input.value);
+  input.value = normalizado === '' ? '' : String(normalizado);
+}
+
+function crearFormularioMeta(ind) {
+  const saved = appState.metas[ind.id] || {};
+  Object.keys(saved).forEach(campo => {
+    saved[campo] = normalizarValorMeta(campo, saved[campo]);
+  });
+  const anios = obtenerAnios();
+  const aniosHtml = anios.map(a => `
+    <div class="meta-field">
+      <label>Meta ${a} *</label>
+      <input type="number" id="${ind.id}-meta_${a}" class="meta-input"
+             placeholder="0" min="0" step="0.01" value="${saved['meta_'+a] ?? ''}"
+             oninput="normalizarMetaInput(this)">
+    </div>`).join('');
+  return `<div class="meta-card">
+    <div class="meta-header">
+      <span class="meta-icon">📊</span>
+      <div class="meta-info">
+        <div class="meta-nombre">${ind.nombre}</div>
+        <div class="meta-unidad">Unidad: ${ind.unidad}</div>
+      </div>
+    </div>
+    <div class="meta-form-grid">
+      <div class="meta-field">
+        <label>Año Base *</label>
+        <input type="number" id="${ind.id}-año_base" class="meta-input" placeholder="2025"
+               min="2020" max="2030" value="${saved.año_base ?? ''}"
+               oninput="normalizarMetaInput(this)">
+      </div>
+      <div class="meta-field">
+        <label>Valor Base *</label>
+        <input type="number" id="${ind.id}-valor_base" class="meta-input" placeholder="0"
+               min="0" step="0.01" value="${saved.valor_base ?? ''}"
+               oninput="normalizarMetaInput(this)">
+      </div>
+    </div>
+    <div class="meta-años-grid">${aniosHtml}</div>
+  </div>`;
+}
+
+function guardarMeta(id, campo, valor) {
+  if (!appState.metas[id]) appState.metas[id] = {};
+  const normalizado = normalizarValorMeta(campo, valor);
+  appState.metas[id][campo] = normalizado;
+  return normalizado;
+}
+
+// ============================================
+// NAVEGACIÓN
+// ============================================
+function irPaso(paso) {
+  document.querySelectorAll('.form-step').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active', 'completed'));
+  for (let i = 1; i < paso; i++) {
+    document.querySelector(`.step[data-step="${i}"]`).classList.add('completed');
+  }
+  document.querySelector(`.form-step[data-step="${paso}"]`).classList.add('active');
+  document.querySelector(`.step[data-step="${paso}"]`).classList.add('active');
+  pasoActual = paso;
+  if (paso === 3) renderizarMetasIndicadores();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function irPaso1a2() {
+  const ue = document.getElementById('codigo_ue').value.trim();
+  const periodo = obtenerPeriodoPei();
+  const mun = document.getElementById('nombre_municipio').value.trim();
+  const ordenanza = document.getElementById('ordenanza_pdc').value.trim();
+  const mis = document.getElementById('mision_institucional').value.trim();
+  if (!extraerAniosPeriodo(periodo).length) {
+    alert('Ingresa un período PEI válido con formato AAAA-AAAA.');
+    return;
+  }
+  if (!ue || !mun || !ordenanza || !mis) {
+    alert('Por favor completa los campos obligatorios: Código UE, Período PEI, Número de Ordenanza, Nombre del Municipio y Misión Institucional.');
+    return;
+  }
+  irPaso(2);
+}
+
+function validarYContinuarAMetas() {
+  const alert = document.getElementById('selectionAlert');
+  if (!extraerAniosPeriodo(obtenerPeriodoPei()).length) {
+    alert.textContent = '⚠️ Ingresa un período PEI válido con formato AAAA-AAAA antes de continuar.';
+    alert.classList.add('show');
+    return;
+  }
+  const oeiChecked = document.querySelectorAll('.oei-checkbox:checked');
+  if (!oeiChecked.length) {
+    alert.textContent = '⚠️ Debes seleccionar al menos 1 OEI con sus indicadores y AEI antes de continuar.';
+    alert.classList.add('show');
+    return;
+  }
+  let valido = true;
+  oeiChecked.forEach(cb => {
+    const codigo = cb.id.replace('oei-', '');
+    const card = document.querySelector(`.oei-card[data-codigo="${codigo}"]`);
+    const indOEI = card.querySelectorAll('input[data-tipo="oei"]:checked').length;
+    const aeiSel = card.querySelectorAll('.aei-checkbox:checked').length;
+    if (!indOEI || !aeiSel) valido = false;
+  });
+  if (!valido) {
+    alert.innerHTML = '⚠️ Cada OEI seleccionado debe tener al menos 1 indicador OEI y 1 AEI seleccionada.';
+    alert.classList.add('show');
+    return;
+  }
+  alert.classList.remove('show');
+  irPaso(3);
+}
+
+function validarMetasYContinuar() {
+  const alert = document.getElementById('metasAlert');
+  const inputs = document.querySelectorAll('#metasContainer .meta-input');
+  let hayVacios = false;
+  inputs.forEach(inp => {
+    if (inp.value === '' || inp.value === null) { hayVacios = true; inp.classList.add('error'); }
+    else inp.classList.remove('error');
+  });
+  if (hayVacios) { alert.classList.add('show'); alert.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  alert.classList.remove('show');
+  actualizarResumenFinal();
+  irPaso(4);
+}
+
+function actualizarResumenFinal() {
+  document.getElementById('resumenOEI').textContent = document.querySelectorAll('.oei-checkbox:checked').length + ' OEI seleccionados';
+  document.getElementById('resumenAEI').textContent = document.querySelectorAll('.aei-checkbox:checked').length + ' AEI seleccionadas';
+  document.getElementById('resumenIndicadores').textContent = document.querySelectorAll('.indicator-checkbox:checked').length + ' indicadores totales';
+  document.getElementById('resumenMetas').textContent = Object.keys(appState.metas).length + ' indicadores con metas definidas';
+}
+
+// ============================================
+// GENERAR / EXPORTAR
+// ============================================
+async function generarDocumento() {
+  const btn = document.getElementById('btnGenerar');
+  const msg = document.getElementById('message');
+  const payload = construirPayload();
+  if (!extraerAniosPeriodo(payload.periodo_pei).length || !payload.ordenanza_pdc) {
+    msg.className = 'message error';
+    msg.style.display = 'block';
+    msg.textContent = 'Completa un período PEI válido y el número de ordenanza antes de generar.';
+    return;
+  }
+
+  // Mostrar loading
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando documento...';
+  msg.className = 'message';
+  msg.style.display = 'none';
+
+  try {
+    const response = await fetch(apiUrl('/generar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    // Leer respuesta como texto primero para detectar errores inesperados
+    const texto = await response.text();
+    let result;
+    try {
+      result = JSON.parse(texto);
+    } catch {
+      throw new Error('Respuesta inesperada del servidor: ' + texto.substring(0, 300));
+    }
+
+    if (result.success) {
+      msg.className = 'message success';
+      msg.style.display = 'block';
+      const nombreArchivo = result.file;
+      msg.innerHTML = `
+        <strong>✅ ¡Documento generado exitosamente!</strong><br><br>
+        <strong>📄 Archivo:</strong> ${nombreArchivo}<br><br>
+        <a href="${apiUrl(`/downloads/${encodeURIComponent(nombreArchivo)}`)}" download class="download-link">📥 Descargar Documento Word</a><br><br>
+        <small>El archivo también se guardó en la carpeta del proyecto.</small>`;
+    } else {
+      throw new Error(result.error || 'Error desconocido del servidor');
+    }
+  } catch (err) {
+    msg.className = 'message error';
+    msg.style.display = 'block';
+    msg.innerHTML = `
+      <strong>❌ Error al generar el documento</strong><br><br>
+      <strong>Detalle:</strong> ${err.message}<br><br>
+      <small>Revisa la terminal donde ejecutaste <code>python generador_pei_fase4.py</code> para ver el error completo.</small>`;
+    console.error('Error generando documento:', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Generar Documento Word';
+  }
+}
+
+function construirPayload() {
+  const anios = sincronizarPeriodo();
+  const normalized = normalizarEstadoGuardado({
+    periodo_pei: appState.periodo_pei,
+    selecciones: appState.selecciones,
+    prioridades: appState.prioridades,
+    metas: appState.metas
+  });
+  appState.selecciones = normalized.selecciones;
+  appState.prioridades = normalized.prioridades;
+  appState.metas = normalized.metas;
+
+  // Datos básicos
+  const campos = ['codigo_ue','nombre_municipio','periodo_pei','nombre_provincia','nombre_region',
+    'nombre_alcalde','resolucion_alcaldia','plan_desarrollo_concertado','ordenanza_pdc',
+    'mision_institucional','politica_general_gobierno','decreto_politica_general_gobierno'];
+  const data = {};
+  campos.forEach(c => { const el = document.getElementById(c); if (el) data[c] = el.value.trim(); });
+
+  // Selecciones: el estado completo es la fuente de verdad, no la visibilidad del DOM.
+  data.selecciones = {
+    oei: [...appState.selecciones.oei],
+    indicadoresOEI: [...appState.selecciones.indicadoresOEI],
+    aei: [...appState.selecciones.aei],
+    indicadoresAEI: [...appState.selecciones.indicadoresAEI]
+  };
+
+  // Prioridades y metas también se serializan desde el estado completo.
+  actualizarEstadoPrioridades();
+  data.prioridades = {
+    oei: [...appState.prioridades.oei],
+    aei: Object.fromEntries(Object.entries(appState.prioridades.aei).map(([codigo, orden]) => [codigo, [...orden]]))
+  };
+
+  // Metas
+  data.metas = filtrarMetas(
+    appState.metas,
+    anios,
+    new Set([...appState.selecciones.indicadoresOEI, ...appState.selecciones.indicadoresAEI])
+  );
+  appState.metas = data.metas;
+
+  return data;
+}
+
+function restaurarDatosGuardados() {
+  const raw = localStorage.getItem('peiFormData');
+  if (!raw) return;
+
+  try {
+    const data = JSON.parse(raw);
+    const campos = ['codigo_ue','periodo_pei','nombre_municipio','nombre_provincia','nombre_region',
+      'nombre_alcalde','resolucion_alcaldia','plan_desarrollo_concertado','ordenanza_pdc',
+      'mision_institucional','politica_general_gobierno','decreto_politica_general_gobierno'];
+    campos.forEach(campo => {
+      const element = document.getElementById(campo);
+      if (element && data[campo] !== undefined) element.value = data[campo];
+    });
+
+    const restored = normalizarEstadoGuardado(data);
+    appState.selecciones = restored.selecciones;
+    appState.prioridades = restored.prioridades;
+    appState.metas = restored.metas;
+    appState.periodo_pei = restored.periodo_pei;
+
+    appState.selecciones.oei.forEach(id => {
+      const checkbox = document.getElementById(id);
+      if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        const card = document.querySelector(`.oei-card[data-codigo="${id.replace('oei-', '')}"]`);
+        card?.classList.add('selected', 'expanded');
+      }
+    });
+    appState.selecciones.aei.forEach(id => {
+      const checkbox = document.getElementById(id);
+      if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        document.getElementById(`aei-item-${id.replace('aei-', '')}`)?.classList.add('selected');
+        document.getElementById(`aei-details-${id.replace('aei-', '')}`).style.display = 'block';
+      }
+    });
+    appState.selecciones.indicadoresOEI.forEach(id => {
+      const checkbox = document.getElementById(id);
+      if (checkbox) checkbox.checked = true;
+    });
+    appState.selecciones.indicadoresAEI.forEach(id => {
+      const checkbox = document.getElementById(id);
+      if (checkbox) checkbox.checked = true;
+    });
+
+    appState.prioridades.oei.forEach(codigo => agregarOEIAPrioridad(codigo));
+    appState.prioridades.oei.forEach(codigo => actualizarAEIEnPrioridad(codigo));
+    actualizarNumerosPrioridad();
+    actualizarContadorPrioridad();
+    verificarPriorityEmpty();
+    guardarDatos();
+  } catch (error) {
+    console.error('Error al restaurar datos:', error);
+  }
+}
+
+function limpiarFormulario() {
+  if (confirm('¿Estás seguro de que deseas limpiar todos los datos?')) {
+    localStorage.removeItem('peiFormData');
+    // Reset estado
+    appState.metas = {};
+    appState.periodo_pei = null;
+    appState.selecciones = { oei: [], indicadoresOEI: [], aei: [], indicadoresAEI: [] };
+    appState.prioridades = { oei: [], aei: {} };
+    // Reset UI
+    ['codigo_ue','periodo_pei','nombre_municipio','nombre_provincia','nombre_region',
+     'nombre_alcalde','resolucion_alcaldia','plan_desarrollo_concertado','ordenanza_pdc',
+     'mision_institucional','politica_general_gobierno','decreto_politica_general_gobierno'
+    ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('priorityContainer').innerHTML = `<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">Los OEI que selecciones aparecerán aquí.</div></div>`;
+    document.getElementById('priorityCount').textContent = '0';
+    renderizarOEIs();
+    irPaso(1);
+  }
+}
+
+const formContainer = document.querySelector('.form-container');
+if (formContainer) {
+  formContainer.addEventListener('input', event => {
+    if (event.target?.id === 'periodo_pei') {
+      sincronizarPeriodo();
+      if (pasoActual === 3) renderizarMetasIndicadores();
+    }
+    guardarDatos();
+  });
+  formContainer.addEventListener('change', guardarDatos);
+}
+</script>
+</body>
+</html>
