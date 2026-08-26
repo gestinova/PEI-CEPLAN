@@ -1449,11 +1449,11 @@ class PEIHandler(SimpleHTTPRequestHandler):
         sel = data.get('selecciones', {})
         oei_list = [x.replace('oei-', '') for x in sel.get('oei', [])]
         aei_list = [x.replace('aei-', '') for x in sel.get('aei', [])]
-        
+
         # Obtener prioridades en el orden enviado por el usuario.
         oei_ordenados = prioridades['oei']
         aei_ordenados = prioridades['aei']
-        
+
         print(f"OEI ordenados: {oei_ordenados}")
         print(f"AEI totales: {len(aei_list)}")
 
@@ -1467,7 +1467,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
             # Ej: OEI.01 → AEI.01.01, AEI.01.02, etc.
             oei_num = oei_code.split('.')[1]  # '01' de 'OEI.01'
             aei_de_este_oei = [
-                aei for aei in aei_list 
+                aei for aei in aei_list
                 if aei.startswith(f'AEI.{oei_num}.')
             ]
             aei_de_este_oei = [codigo for codigo in aei_ordenados[oei_code] if codigo in aei_de_este_oei]
@@ -1478,7 +1478,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
             codigo_oei: {codigo: index + 1 for index, codigo in enumerate(codigos_aei)}
             for codigo_oei, codigos_aei in aei_ordenados.items()
         }
-        
+
         print(f"\nOrden de fichas: {codigos_ordenados}")
 
         # Metas
@@ -1848,7 +1848,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
             tb = doc_base.tables[-1]
             if fg > 0 and tb.rows and tb.rows[0].cells and tb.rows[0].cells[0].paragraphs:
                 tb.rows[0].cells[0].paragraphs[0].paragraph_format.page_break_before = True
-            
+
             # Llenar datos
             def stxt(ri, ci, v):
                 if ri < len(tb.rows) and ci < len(tb.rows[ri].cells):
@@ -1861,7 +1861,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                             cell.paragraphs[0].runs[0].text = str(v)
                         else:
                             cell.paragraphs[0].add_run(str(v))
-            
+
             stxt(1, 1, ficha.get('objetivo_accion', ''))
             stxt(2, 1, ficha.get('nombre_indicador', ''))
             stxt(3, 1, ficha.get('justificacion', ''))
@@ -1883,7 +1883,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     continue
                 stxt(12, column, anual.get('valor_relativo', ''))
                 stxt(13, column, valor_absoluto_ficha(anual))
-            
+
             fg += 1
             print(f"  {fg}. {codigo} indicador {ordinal}")
 
