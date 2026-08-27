@@ -1022,7 +1022,41 @@ document.getElementById('peiForm').addEventListener('submit', async (e) => {
     try {
         // Obtener todos los datos del localStorage
         const savedData = JSON.parse(localStorage.getItem('peiFormData') || '{}');
-        
+
+    // === CÓDIGO SALVAVIDAS PARA PRIORIDADES ===
+        if (!savedData.prioridades) {
+            savedData.prioridades = { oei: [], aei: {} };
+        }
+
+        // 1. Auto-llenar prioridades OEI si están vacías
+        if (!savedData.prioridades.oei || savedData.prioridades.oei.length === 0) {
+            if (savedData.selecciones && savedData.selecciones.oei) {
+                savedData.prioridades.oei = savedData.selecciones.oei.map(id => id.replace('oei-', ''));
+            }
+        }
+
+        // 2. Auto-llenar prioridades AEI agrupándolas por su OEI padre
+        if (savedData.selecciones && savedData.selecciones.aei) {
+            if (!savedData.prioridades.aei) savedData.prioridades.aei = {};
+            
+            savedData.selecciones.aei.forEach(aeiId => {
+                const codigoAei = aeiId.replace('aei-', ''); // Ej: AEI.01.01
+                const match = codigoAei.match(/^AEI\.(\d{2})/);
+                if (match) {
+                    const codigoOei = `OEI.${match[1]}`; // Ej: OEI.01
+                    
+                    // Aseguramos que exista el array para este OEI
+                    if (!savedData.prioridades.aei[codigoOei]) {
+                        savedData.prioridades.aei[codigoOei] = [];
+                    }
+                    // Agregamos la AEI si por alguna razón no estaba en la lista de prioridades
+                    if (!savedData.prioridades.aei[codigoOei].includes(codigoAei)) {
+                        savedData.prioridades.aei[codigoOei].push(codigoAei);
+                    }
+                }
+            });
+        }
+
         // Validar que hay datos
         if (!savedData.codigo_ue || !savedData.nombre_municipio) {
             throw new Error('Faltan datos básicos. Por favor completa el Paso 1.');
@@ -1058,7 +1092,15 @@ document.getElementById('peiForm').addEventListener('submit', async (e) => {
         loading.classList.remove('active');
         
         if (!response.ok || !result.success) {
-            throw new Error(result.error || `Error HTTP ${response.status} al generar el documento`);
+            let errorMsg = result.error || `Error HTTP ${response.status} al generar el documento`;
+            
+            // Extraer y formatear los detalles exactos de la validación del backend
+            if (result.details && result.details.length > 0) {
+                const detalles = result.details.map(d => d.message).join("<br>• ");
+                errorMsg += `<br><br><span style="color: #dc3545;"><strong>Detalles a corregir:</strong></span><br>• ${detalles}`;
+            }
+            
+            throw new Error(errorMsg);
         }
 
         // Mostrar mensaje de éxito
