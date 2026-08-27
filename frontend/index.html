@@ -302,10 +302,16 @@ const appState = {
 let pasoActual = 1;
 let draggedElement = null;
 let draggedAEIElement = null;
-const API_BASE_URL = String(window.PEI_API_BASE_URL || '').replace(/\/+$/, '');
+
+// ============================================
+// CONFIGURACIÓN DINÁMICA DE URL (LOCAL VS RENDER)
+// ============================================
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+const RENDER_API_URL = "https://pei-ceplan-vr1m.onrender.com";
+const API_BASE_URL = isLocal ? "http://localhost:8000" : RENDER_API_URL;
 
 function apiUrl(path) {
-  return `${API_BASE_URL}${path}`;
+    return `${API_BASE_URL}${path}`;
 }
 
 function configurarAutocompletadoUE() {
