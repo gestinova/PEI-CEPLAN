@@ -1907,7 +1907,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
         return output.name if output_path is None else str(output)
 
 def iniciar_servidor():
-    host = os.environ.get('PEI_HOST', '127.0.0.1')
+    host = '0.0.0.0'
     port = int(os.environ.get('PORT', '8000'))
     httpd = HTTPServer(
         (host, port),
