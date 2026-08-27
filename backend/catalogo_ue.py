@@ -3,16 +3,21 @@
 import math
 import os
 import re
+import warnings
 from pathlib import Path
+
+# Ocultar la advertencia amarilla de openpyxl
+warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 try:
     from openpyxl import load_workbook as _load_workbook
 except ImportError:  # The server must still start when the optional data file is absent.
     _load_workbook = None
 
-
 CATALOGO_UE_ENV = 'PEI_IT_PEI_PATH'
+# Definimos la ruta de la raíz del proyecto (un nivel arriba de la carpeta backend)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 _ID_UE_PATTERN = re.compile(r'^[0-9]{1,20}$')
 _catalogo_cache = None
 _catalogo_cache_key = None
@@ -40,9 +45,9 @@ def resolver_ruta_catalogo(path=None):
         candidate = Path(configured).expanduser()
         return candidate if candidate.is_absolute() else PROJECT_ROOT / candidate
 
+    # Apuntamos directamente a la raíz del repositorio donde está el Excel
     candidates = (
         PROJECT_ROOT / 'IT_PEI.xlsx',
-        PROJECT_ROOT / 'archivos-gen' / 'IT_PEI.xlsx',
     )
     return next((candidate for candidate in candidates if candidate.is_file()), candidates[0])
 
@@ -132,6 +137,7 @@ def _leer_catalogo(path):
             catalogo = {}
             catalogo.update(_filas_de_hoja(workbook, 'IT PEI', ('Periodo PEI',)))
             catalogo.update(_filas_de_hoja(workbook, 'Data_UEs', ('Ult.PEI',)))
+            print(f"✅ Catálogo de UEs cargado con éxito: {len(catalogo)} entidades.")
             return catalogo
         finally:
             close = getattr(workbook, 'close', None)
@@ -159,6 +165,7 @@ def cargar_catalogo_ues(path=None):
     if cache_key[1] is None:
         _catalogo_cache = {}
         _catalogo_cache_key = cache_key
+        print(f"⚠️ AVISO: No se encontró el catálogo Excel en: {resolved_path}")
         return _catalogo_cache
 
     _catalogo_cache = _leer_catalogo(resolved_path)
