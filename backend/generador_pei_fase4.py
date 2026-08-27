@@ -1200,6 +1200,14 @@ class PEIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory=None, **kwargs):
         super().__init__(*args, directory=str(directory or FRONTEND_DIR), **kwargs)
 
+    # 1. SOLUCIÓN CORS: Función agregada para dar permisos a Vercel
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
     def do_GET(self):
         path = urlsplit(self.path).path
         if path == '/api/ue' or path.startswith('/api/ue/'):
@@ -1381,8 +1389,23 @@ class PEIHandler(SimpleHTTPRequestHandler):
 
         try:
             validar_payload(data)
-            output = self.generar_documento(data)
-            self._send_json(200, {'success': True, 'file': output, 'message': 'Generado'})
+            output_name = self.generar_documento(data)
+            
+            # 2. SOLUCIÓN DESCARGA: Leemos el archivo y lo enviamos como bytes (Blob)
+            import urllib.parse
+            file_path = ARCHIVOS_GEN_DIR / output_name
+            with open(file_path, 'rb') as f:
+                file_bytes = f.read()
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+            self.send_header('Content-Disposition', f'attachment; filename="{urllib.parse.quote(output_name)}"')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Expose-Headers', 'Content-Disposition')
+            self.send_header('Content-Length', str(len(file_bytes)))
+            self.end_headers()
+            self.wfile.write(file_bytes)
+            
         except PayloadValidationError as error:
             self._send_json(422, {
                 'success': False,
@@ -1401,6 +1424,8 @@ class PEIHandler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
+        # 3. SOLUCIÓN CORS: Cabecera agregada en las respuestas JSON
+        self.send_header('Access-Control-Allow-Origin', '*') 
         self.end_headers()
         self.wfile.write(body)
 
