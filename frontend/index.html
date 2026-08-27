@@ -750,7 +750,16 @@ async function generarDocumento() {
     if (!response.ok) {
       const errorText = await response.text();
       let errorMsg = `Error HTTP ${response.status}`;
-      try { const errJson = JSON.parse(errorText); errorMsg = errJson.error || errorMsg; } catch (e) {}
+      try { 
+          const errJson = JSON.parse(errorText); 
+          errorMsg = errJson.error || errorMsg; 
+          
+          // === MOSTRAR EL DETALLE EXACTO DEL ERROR ===
+          if (errJson.details && errJson.details.length > 0) {
+              const detalles = errJson.details.map(d => d.message).join("<br>• ");
+              errorMsg += `<br><br><span style="color: #dc3545;"><strong>Detalles a corregir:</strong></span><br>• ${detalles}`;
+          }
+      } catch (e) {}
       throw new Error(errorMsg);
     }
 
@@ -803,11 +812,34 @@ function construirPayload() {
 
   const oeiOrder = Array.from(document.querySelectorAll('.priority-item')).map(i => i.dataset.codigo);
   const aeiOrder = {};
+  
   oeiOrder.forEach(cod => {
     const codEscapado = cod.replace(/\./g, '\\.');
     const sortable = document.querySelector(`#aei-priority-${codEscapado} .aei-sortable`);
-    if (sortable) aeiOrder[cod] = Array.from(sortable.querySelectorAll('.aei-priority-item')).map(i => i.dataset.codigo);
+    if (sortable) {
+        aeiOrder[cod] = Array.from(sortable.querySelectorAll('.aei-priority-item')).map(i => i.dataset.codigo);
+    } else {
+        aeiOrder[cod] = [];
+    }
   });
+
+  // === SALVAVIDAS DE PRIORIDADES ===
+  // Si el usuario no desplegó la lista, rellenamos las AEI con las selecciones que hizo
+  data.selecciones.aei.forEach(aeiId => {
+      const codigoAei = aeiId.replace('aei-', ''); // Ej: AEI.01.01
+      const match = codigoAei.match(/^AEI\.(\d{2})/);
+      if (match) {
+          const codigoOei = `OEI.${match[1]}`; // Ej: OEI.01
+          if (!aeiOrder[codigoOei]) {
+              aeiOrder[codigoOei] = [];
+          }
+          if (!aeiOrder[codigoOei].includes(codigoAei)) {
+              aeiOrder[codigoOei].push(codigoAei);
+          }
+      }
+  });
+  // ===================================
+
   data.prioridades = { oei: oeiOrder, aei: aeiOrder };
   data.metas = appState.metas;
 
