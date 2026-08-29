@@ -9,6 +9,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory
 from unittest.mock import patch
 
 import catalogo_ue
+import generador_pei_fase4
 from generador_pei_fase4 import PEIHandler
 
 
@@ -89,18 +90,187 @@ class CatalogoLoaderTests(unittest.TestCase):
 
 
 class EndpointTests(unittest.TestCase):
-    def request(self, path, method='GET', body=None, headers=None):
+    def request_raw(self, path, method='GET', body=None, headers=None):
         server = HTTPServer(('127.0.0.1', 0), PEIHandler)
         thread = threading.Thread(target=server.handle_request)
         thread.start()
         connection = http.client.HTTPConnection(*server.server_address)
         connection.request(method, path, body=body, headers=headers or {})
         response = connection.getresponse()
-        body = json.loads(response.read().decode('utf-8'))
+        response_status = response.status
+        response_headers = dict(response.getheaders())
+        response_body = response.read()
         connection.close()
         thread.join(timeout=2)
         server.server_close()
-        return response.status, body
+        return response_status, response_headers, response_body
+
+    def request(self, path, method='GET', body=None, headers=None):
+        status, _, response_body = self.request_raw(path, method, body, headers)
+        return status, json.loads(response_body.decode('utf-8'))
+
+    def test_root_serves_the_active_frontend_entrypoint(self):
+        status, headers, body = self.request_raw('/')
+
+        self.assertEqual(status, 200)
+        self.assertIn('text/html', headers.get('Content-Type', headers.get('Content-type', '')))
+        self.assertIn(b'<title>Generador de Documentos PEI', body)
+
+    def test_head_serves_allowed_public_files_without_body(self):
+        for path in ('/', '/index.html', '/matriz_estandar.json'):
+            with self.subTest(path=path):
+                status, headers, body = self.request_raw(path, method='HEAD')
+
+                self.assertEqual(status, 200)
+                self.assertEqual(body, b'')
+                self.assertGreater(int(headers['Content-Length']), 0)
+
+    def test_head_blocks_internal_and_traversal_paths_without_creating_outputs(self):
+        before = sorted(path.name for path in generador_pei_fase4.ARCHIVOS_GEN_DIR.iterdir())
+        blocked_paths = (
+            '/generador_pei_fase4.py',
+            '/backend/generador_pei_fase4.py',
+            '/backend/fichas_tecnicas.json',
+            '/plantillas/PEI_Estandar_-_Informe.docx',
+            '/IT_PEI.xlsx',
+            '/archivos-gen/interno.docx',
+            '/../backend/generador_pei_fase4.py',
+            '/%2e%2e/backend/generador_pei_fase4.py',
+            '/../archivos-gen/interno.docx',
+        )
+
+        for path in blocked_paths:
+            with self.subTest(path=path):
+                status, _, body = self.request_raw(path, method='HEAD')
+
+                self.assertEqual(status, 404)
+                self.assertEqual(body, b'')
+
+        after = sorted(path.name for path in generador_pei_fase4.ARCHIVOS_GEN_DIR.iterdir())
+        self.assertEqual(after, before)
+
+    def test_options_allows_only_the_configured_origin(self):
+        with patch.dict(os.environ, {'PEI_ALLOWED_ORIGIN': 'https://pei.example'}):
+            denied_status, denied_headers, denied_body = self.request_raw(
+                '/generar',
+                method='OPTIONS',
+                headers={
+                    'Origin': 'https://other.example',
+                    'Access-Control-Request-Method': 'POST',
+                },
+            )
+            allowed_status, allowed_headers, _ = self.request_raw(
+                '/generar',
+                method='OPTIONS',
+                headers={
+                    'Origin': 'https://pei.example',
+                    'Access-Control-Request-Method': 'POST',
+                    'Access-Control-Request-Headers': 'Content-Type',
+                },
+            )
+
+        self.assertEqual(denied_status, 403)
+        self.assertNotIn('Access-Control-Allow-Origin', denied_headers)
+        self.assertEqual(json.loads(denied_body)['error']['code'], 'cors_origin_not_allowed')
+        self.assertEqual(allowed_status, 204)
+        self.assertEqual(allowed_headers['Access-Control-Allow-Origin'], 'https://pei.example')
+        self.assertEqual(allowed_headers['Access-Control-Allow-Methods'], 'GET, POST, OPTIONS')
+        self.assertEqual(allowed_headers['Access-Control-Allow-Headers'], 'Content-Type')
+        self.assertNotEqual(allowed_headers['Access-Control-Allow-Origin'], '*')
+
+    def test_matrix_get_includes_cors_only_for_the_configured_origin(self):
+        with patch.dict(os.environ, {'PEI_ALLOWED_ORIGIN': 'https://pei.example'}):
+            allowed_status, allowed_headers, allowed_body = self.request_raw(
+                '/matriz_estandar.json',
+                headers={'Origin': 'https://pei.example'},
+            )
+            denied_status, denied_headers, _ = self.request_raw(
+                '/matriz_estandar.json',
+                headers={'Origin': 'https://other.example'},
+            )
+            same_origin_status, same_origin_headers, _ = self.request_raw(
+                '/matriz_estandar.json',
+            )
+
+        self.assertEqual(allowed_status, 200)
+        self.assertTrue(json.loads(allowed_body)['oei'])
+        self.assertEqual(allowed_headers['Access-Control-Allow-Origin'], 'https://pei.example')
+        self.assertEqual(allowed_headers['Vary'], 'Origin')
+        self.assertEqual(denied_status, 200)
+        self.assertNotIn('Access-Control-Allow-Origin', denied_headers)
+        self.assertEqual(same_origin_status, 200)
+        self.assertNotIn('Access-Control-Allow-Origin', same_origin_headers)
+
+    def test_json_api_response_includes_cors_for_the_configured_origin(self):
+        with patch.dict(os.environ, {'PEI_ALLOWED_ORIGIN': 'https://pei.example'}), \
+                patch('generador_pei_fase4.obtener_ue', return_value=None):
+            status, headers, body = self.request_raw(
+                '/api/ue/999999',
+                headers={'Origin': 'https://pei.example'},
+            )
+
+        self.assertEqual(status, 404)
+        self.assertEqual(headers['Access-Control-Allow-Origin'], 'https://pei.example')
+        self.assertEqual(json.loads(body)['error']['code'], 'ue_not_found')
+
+    def test_wildcard_cors_configuration_does_not_emit_wildcard_headers(self):
+        with patch.dict(os.environ, {'PEI_ALLOWED_ORIGIN': '*'}):
+            status, headers, _ = self.request_raw(
+                '/matriz_estandar.json',
+                headers={'Origin': 'https://pei.example'},
+            )
+
+        self.assertEqual(status, 200)
+        self.assertNotIn('Access-Control-Allow-Origin', headers)
+
+    def test_generate_returns_json_and_download_route_returns_docx(self):
+        payload = {
+            'codigo_ue': '150101',
+            'nombre_municipio': 'Municipio Prueba',
+            'periodo_pei': '2026-2030',
+            'ordenanza_pdc': '002-2024-MDL',
+            'selecciones': {
+                'oei': ['oei-OEI.01'],
+                'aei': ['aei-AEI.01.01'],
+                'indicadoresOEI': ['ind-oei-OEI.01-0'],
+                'indicadoresAEI': ['ind-aei-AEI.01.01-0'],
+            },
+            'prioridades': {
+                'oei': ['OEI.01'],
+                'aei': {'OEI.01': ['AEI.01.01']},
+            },
+        }
+        filename = 'PEI_Municipio_Prueba.docx'
+
+        with TemporaryDirectory() as temp_dir:
+            generated_dir = Path(temp_dir)
+            (generated_dir / filename).write_bytes(b'PK\x03\x04fake-docx')
+            with patch('generador_pei_fase4.ARCHIVOS_GEN_DIR', generated_dir), \
+                    patch.object(PEIHandler, 'generar_documento', return_value=filename):
+                post_status, post_headers, post_body = self.request_raw(
+                    '/generar',
+                    method='POST',
+                    body=json.dumps(payload),
+                    headers={'Content-Type': 'application/json'},
+                )
+                download_status, download_headers, download_body = self.request_raw(
+                    f'/downloads/{filename}',
+                )
+
+        result = json.loads(post_body.decode('utf-8'))
+        self.assertEqual(post_status, 200)
+        self.assertIn('application/json', post_headers.get('Content-Type', post_headers.get('Content-type', '')))
+        self.assertEqual(result, {
+            'success': True,
+            'file': filename,
+            'message': 'Generado',
+        })
+        self.assertEqual(download_status, 200)
+        self.assertEqual(
+            download_headers['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+        self.assertEqual(download_body, b'PK\x03\x04fake-docx')
 
     def test_valid_id_returns_catalog_data(self):
         with patch('generador_pei_fase4.obtener_ue', return_value={

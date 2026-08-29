@@ -1305,9 +1305,9 @@ class FreshDocxGenerationTests(unittest.TestCase):
 
 
 class SecurityRegressionTests(unittest.TestCase):
-    def test_server_uses_configured_port_with_local_default_host(self):
+    def test_server_uses_configured_port_and_host(self):
         fake_server = types.SimpleNamespace(serve_forever=lambda: None)
-        with patch.dict(os.environ, {'PORT': '8123'}, clear=False), \
+        with patch.dict(os.environ, {'PORT': '8123', 'PEI_HOST': '127.0.0.1'}, clear=False), \
                 patch('generador_pei_fase4.HTTPServer', return_value=fake_server) as http_server:
             iniciar_servidor()
 
@@ -1326,7 +1326,14 @@ class SecurityRegressionTests(unittest.TestCase):
 
     def test_static_allowlist_does_not_expose_source_files(self):
         handler = object.__new__(PEIHandler)
+        self.assertEqual(handler._allowed_static_file('/'), 'index.html')
+        self.assertEqual(handler._allowed_static_file('/index.html'), 'index.html')
+        self.assertIsNone(handler._allowed_static_file('/index_fase4.html'))
+        self.assertIsNone(handler._allowed_static_file('/app_fase4.js'))
         self.assertIsNone(handler._allowed_static_file('/generador_pei_fase4.py'))
+        frontend_dir = PROJECT_ROOT / 'frontend'
+        self.assertFalse((frontend_dir / 'app_fase4.js').exists())
+        self.assertFalse((frontend_dir / 'styles_fase4.css').exists())
 
 
 if __name__ == '__main__':
