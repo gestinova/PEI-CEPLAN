@@ -67,9 +67,12 @@ body {
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 40, 90, 0.08);
   border: 1px solid var(--border-gray);
-  overflow: hidden;
+  overflow: visible !important; /* Forzamos que el menú pueda salir de la caja */
 }
 
+/* ============================================================
+   HEADER CEPLAN
+   ============================================================ */
 /* ============================================================
    HEADER CEPLAN
    ============================================================ */
@@ -78,6 +81,9 @@ body {
   color: white;
   padding: 30px 40px;
   border-bottom: 4px solid var(--peru-red);
+  /* Mantenemos las esquinas curvas que le quitamos al contenedor */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
 .header h1 {
@@ -907,6 +913,7 @@ textarea {
 }
 
 @media (max-width: 768px) {
+
   .two-column,
   .meta-form-grid {
     grid-template-columns: 1fr;
@@ -931,4 +938,20 @@ textarea {
   .meta-años-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* Estilo forzado para el input híbrido */
+.input-desplegable {
+  background: #ffffff url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23666%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E") no-repeat right 15px center !important;
+  background-size: 16px !important;
+  padding-right: 40px !important;
+  cursor: pointer !important;
+}
+
+/* Ocultamos la flecha nativa pero mantenemos su zona clickeable */
+.input-desplegable::-webkit-calendar-picker-indicator {
+  opacity: 0 !important;
+  width: 30px !important;
+  height: 100% !important;
+  cursor: pointer !important;
 }

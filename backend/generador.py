@@ -8,7 +8,7 @@ import json, math, os, re, sys, tempfile, unicodedata
 from copy import deepcopy
 from pathlib import Path
 
-from catalogo_ue import normalizar_id_ue, obtener_ue
+from catalogo import normalizar_id_ue, obtener_ue
 
 
 WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -34,11 +34,11 @@ VISIBLE_CODE_PATTERN = re.compile(
     r'(?<![A-Za-z0-9_.-])(OEI\.\d+|AEI\.\d+\.\d+)(?![A-Za-z0-9_.-])'
 )
 STATIC_FILE_ALLOWLIST = {
-    '/': 'index_fase4.html',
-    '/index_fase4.html': 'index_fase4.html',
+    '/': 'index.html',
+    '/index.html': 'index.html',
     '/matriz_estandar.json': 'matriz_estandar.json',
-    '/app_fase4.js': 'app_fase4.js',
-    '/styles_fase4.css': 'styles_fase4.css',
+    '/app.js': 'app.js',
+    '/styles.css': 'styles.css',
 }
 
 
