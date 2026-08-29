@@ -21,6 +21,7 @@ MATRIZ_PATH = FRONTEND_DIR / 'matriz_estandar.json'
 FICHAS_PATH = BACKEND_DIR / 'fichas_tecnicas.json'
 MAX_PAYLOAD_BYTES = 1024 * 1024
 MAX_MUNICIPALITY_LENGTH = 120
+CORS_ORIGIN_ENV = 'PEI_ALLOWED_ORIGIN'
 ORDENANZA_PLACEHOLDER = '«Ordenanza_PDC»'
 ANEXO_FICHAS_MARKER = 'ANEXO A - 6'
 ANEXO_B1_MARKER = 'ANEXO B - 1:'
@@ -34,11 +35,9 @@ VISIBLE_CODE_PATTERN = re.compile(
     r'(?<![A-Za-z0-9_.-])(OEI\.\d+|AEI\.\d+\.\d+)(?![A-Za-z0-9_.-])'
 )
 STATIC_FILE_ALLOWLIST = {
-    '/': 'index_fase4.html',
-    '/index_fase4.html': 'index_fase4.html',
+    '/': 'index.html',
+    '/index.html': 'index.html',
     '/matriz_estandar.json': 'matriz_estandar.json',
-    '/app_fase4.js': 'app_fase4.js',
-    '/styles_fase4.css': 'styles_fase4.css',
 }
 
 
@@ -755,6 +754,19 @@ class PayloadValidationError(ValueError):
         super().__init__('El payload contiene datos inválidos')
 
 
+def _configured_cors_origin():
+    """Return one valid configured origin; unset means same-origin only."""
+    origin = os.environ.get(CORS_ORIGIN_ENV, '').strip().rstrip('/')
+    if origin == '*':
+        return None
+    parsed = urlsplit(origin)
+    if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+        return None
+    if parsed.path not in {'', '/'} or parsed.query or parsed.fragment:
+        return None
+    return origin
+
+
 def cargar_matriz_estandar():
     with MATRIZ_PATH.open('r', encoding='utf-8') as matriz_file:
         return json.load(matriz_file)
@@ -1200,22 +1212,42 @@ class PEIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory=None, **kwargs):
         super().__init__(*args, directory=str(directory or FRONTEND_DIR), **kwargs)
 
-    # 1. SOLUCIÓN CORS: Función agregada para dar permisos a Vercel
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        request_origin = self.headers.get('Origin')
+        cors_origin = self._cors_origin()
+        if request_origin and cors_origin is None:
+            self._send_json(403, {
+                'success': False,
+                'error': {
+                    'code': 'cors_origin_not_allowed',
+                    'message': 'El origen no está habilitado para este servicio.',
+                },
+            })
+            return
+
+        self.send_response(204)
+        if cors_origin:
+            self.send_header('Access-Control-Allow-Origin', cors_origin)
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.send_header('Access-Control-Max-Age', '600')
+            self.send_header('Vary', 'Origin')
         self.end_headers()
 
     def do_GET(self):
+        self._serve_request(include_body=True)
+
+    def do_HEAD(self):
+        self._serve_request(include_body=False)
+
+    def _serve_request(self, *, include_body):
         path = urlsplit(self.path).path
         if path == '/api/ue' or path.startswith('/api/ue/'):
-            self._get_unidad_ejecutora(path)
+            self._get_unidad_ejecutora(path, include_body=include_body)
             return
 
         if path.startswith('/downloads/'):
-            self._serve_download(path)
+            self._serve_download(path, include_body=include_body)
             return
 
         allowed_file = self._allowed_static_file(path)
@@ -1226,17 +1258,34 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     'code': 'not_found',
                     'message': 'Recurso no encontrado.',
                 },
-            })
+            }, include_body=include_body)
             return
 
-        original_path = self.path
-        self.path = '/' + allowed_file
-        try:
-            super().do_GET()
-        finally:
-            self.path = original_path
+        self._serve_static_file(allowed_file, include_body=include_body)
 
-    def _serve_download(self, path):
+    def _serve_static_file(self, filename, *, include_body=True):
+        file_path = Path(self.directory) / filename
+        if not file_path.is_file():
+            self._send_json(404, {
+                'success': False,
+                'error': {
+                    'code': 'not_found',
+                    'message': 'Recurso no encontrado.',
+                },
+            }, include_body=include_body)
+            return
+
+        self.send_response(200)
+        self.send_header('Content-type', self.guess_type(str(file_path)))
+        self.send_header('Content-Length', str(file_path.stat().st_size))
+        self._send_cors_headers()
+        self.end_headers()
+        if include_body:
+            with file_path.open('rb') as static_file:
+                while chunk := static_file.read(64 * 1024):
+                    self.wfile.write(chunk)
+
+    def _serve_download(self, path, *, include_body=True):
         filename = unquote(path.removeprefix('/downloads/'))
         if '/' in filename or '\\' in filename or not filename:
             self._send_json(404, {
@@ -1245,7 +1294,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     'code': 'not_found',
                     'message': 'Recurso no encontrado.',
                 },
-            })
+            }, include_body=include_body)
             return
 
         try:
@@ -1265,7 +1314,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     'code': 'not_found',
                     'message': 'Recurso no encontrado.',
                 },
-            })
+            }, include_body=include_body)
             return
 
         self.send_response(200)
@@ -1275,10 +1324,12 @@ class PEIHandler(SimpleHTTPRequestHandler):
         )
         self.send_header('Content-Length', str(file_path.stat().st_size))
         self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+        self._send_cors_headers()
         self.end_headers()
-        with file_path.open('rb') as generated_file:
-            while chunk := generated_file.read(64 * 1024):
-                self.wfile.write(chunk)
+        if include_body:
+            with file_path.open('rb') as generated_file:
+                while chunk := generated_file.read(64 * 1024):
+                    self.wfile.write(chunk)
 
     def _allowed_static_file(self, path):
         allowed_file = STATIC_FILE_ALLOWLIST.get(path)
@@ -1287,7 +1338,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
 
         return None
 
-    def _get_unidad_ejecutora(self, path):
+    def _get_unidad_ejecutora(self, path, *, include_body=True):
         parts = path.split('/')
         if len(parts) != 4 or parts[1:3] != ['api', 'ue'] or not parts[3]:
             self._send_json(400, {
@@ -1296,7 +1347,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     'code': 'invalid_id',
                     'message': 'La ruta debe tener el formato /api/ue/<id>.',
                 },
-            })
+            }, include_body=include_body)
             return
 
         try:
@@ -1305,7 +1356,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {
                 'success': False,
                 'error': {'code': 'invalid_id', 'message': str(error)},
-            })
+            }, include_body=include_body)
             return
 
         try:
@@ -1317,7 +1368,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     'code': 'internal_error',
                     'message': 'Error interno del servidor.',
                 },
-            })
+            }, include_body=include_body)
             return
 
         if data is None:
@@ -1327,10 +1378,10 @@ class PEIHandler(SimpleHTTPRequestHandler):
                     'code': 'ue_not_found',
                     'message': 'La UE no existe en el catalogo.',
                 },
-            })
+            }, include_body=include_body)
             return
 
-        self._send_json(200, {'success': True, 'data': data})
+        self._send_json(200, {'success': True, 'data': data}, include_body=include_body)
 
     def do_POST(self):
         if urlsplit(self.path).path != '/generar':
@@ -1389,23 +1440,12 @@ class PEIHandler(SimpleHTTPRequestHandler):
 
         try:
             validar_payload(data)
-            output_name = self.generar_documento(data)
-            
-            # 2. SOLUCIÓN DESCARGA: Leemos el archivo y lo enviamos como bytes (Blob)
-            import urllib.parse
-            file_path = ARCHIVOS_GEN_DIR / output_name
-            with open(file_path, 'rb') as f:
-                file_bytes = f.read()
-
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-            self.send_header('Content-Disposition', f'attachment; filename="{urllib.parse.quote(output_name)}"')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Expose-Headers', 'Content-Disposition')
-            self.send_header('Content-Length', str(len(file_bytes)))
-            self.end_headers()
-            self.wfile.write(file_bytes)
-            
+            output = self.generar_documento(data)
+            self._send_json(200, {
+                'success': True,
+                'file': output,
+                'message': 'Generado',
+            })
         except PayloadValidationError as error:
             self._send_json(422, {
                 'success': False,
@@ -1419,15 +1459,32 @@ class PEIHandler(SimpleHTTPRequestHandler):
                 'error': 'Error interno del servidor.',
             })
 
-    def _send_json(self, status, payload):
+    def _send_json(self, status, payload, *, include_body=True):
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
-        # 3. SOLUCIÓN CORS: Cabecera agregada en las respuestas JSON
-        self.send_header('Access-Control-Allow-Origin', '*') 
+        self._send_cors_headers()
         self.end_headers()
-        self.wfile.write(body)
+        if include_body:
+            self.wfile.write(body)
+
+    def _cors_origin(self):
+        configured = _configured_cors_origin()
+        request_origin = self.headers.get('Origin', '').strip().rstrip('/')
+        if configured and request_origin == configured:
+            return configured
+        return None
+
+    def _send_cors_headers(self):
+        configured = _configured_cors_origin()
+        if not configured:
+            return
+        self.send_header('Vary', 'Origin')
+        cors_origin = self._cors_origin()
+        if cors_origin:
+            self.send_header('Access-Control-Allow-Origin', cors_origin)
+            self.send_header('Access-Control-Expose-Headers', 'Content-Disposition')
 
     def log_message(self, format, *args):
         pass
@@ -1932,7 +1989,7 @@ class PEIHandler(SimpleHTTPRequestHandler):
         return output.name if output_path is None else str(output)
 
 def iniciar_servidor():
-    host = '0.0.0.0'
+    host = os.environ.get('PEI_HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', '8000'))
     httpd = HTTPServer(
         (host, port),

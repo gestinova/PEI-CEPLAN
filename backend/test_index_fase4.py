@@ -6,9 +6,9 @@ import unittest
 from pathlib import Path
 
 
-HTML_PATH = Path(__file__).resolve().parent.parent / 'frontend' / 'index_fase4.html'
+HTML_PATH = Path(__file__).resolve().parent.parent / 'frontend' / 'index.html'
 MATRIX_PATH = HTML_PATH.parent / 'matriz_estandar.json'
-INDEX_PATH = HTML_PATH.parent / 'index.html'
+VERCEL_PATH = HTML_PATH.parent / 'vercel.json'
 
 
 def inline_script():
@@ -19,18 +19,21 @@ def inline_script():
     return scripts[0]
 
 
-def run_inline(expression):
+def run_inline(expression, api_base_url=None):
     matrix = json.loads(MATRIX_PATH.read_text(encoding='utf-8'))
     source = (
         inline_script()
         + '\n'
         + f'MATRIZ_ESTANDAR = {json.dumps(matrix, ensure_ascii=False)};\n'
-        + "globalThis.__exports = { appState, quitarAEISeleccion, normalizarEstadoGuardado, extraerAniosPeriodo, sincronizarPeriodo, normalizarMetaInput, construirPayload, guardarDatos };"
+        + "globalThis.__exports = { API_BASE_URL, apiUrl, appState, quitarAEISeleccion, normalizarEstadoGuardado, extraerAniosPeriodo, sincronizarPeriodo, normalizarMetaInput, construirPayload, guardarDatos };"
     )
     harness = f"""
 const vm = require('vm');
 const context = {{
-  window: {{ addEventListener() {{}} }},
+  window: {{
+    PEI_API_BASE_URL: {json.dumps(api_base_url)},
+    addEventListener() {{}},
+  }},
   localStorage: {{
     values: {{}},
     setItem(key, value) {{ this.values[key] = value; }},
@@ -72,6 +75,67 @@ class IndexFase4StateTests(unittest.TestCase):
         self.assertIn("fetch(apiUrl('/generar')", html)
         self.assertIn("apiUrl(`/downloads/${encodeURIComponent(nombreArchivo)}`)", html)
         self.assertNotIn('TAB', html)
+        self.assertIn("window.PEI_API_BASE_URL || ''", html)
+        self.assertNotIn('RENDER_API_URL', html)
+        self.assertNotIn('onrender.com', html)
+
+    def test_api_url_defaults_to_relative_and_honors_explicit_override(self):
+        default = run_inline(
+            "({ base: __exports.API_BASE_URL, generate: __exports.apiUrl('/generar'), matrix: __exports.apiUrl('/matriz_estandar.json') })"
+        )
+        override = run_inline(
+            "({ base: __exports.API_BASE_URL, generate: __exports.apiUrl('/generar') })",
+            'https://pei-ceplan-vr1m.onrender.com/',
+        )
+
+        self.assertEqual(default, {
+            'base': '',
+            'generate': '/generar',
+            'matrix': '/matriz_estandar.json',
+        })
+        self.assertEqual(override, {
+            'base': 'https://pei-ceplan-vr1m.onrender.com',
+            'generate': 'https://pei-ceplan-vr1m.onrender.com/generar',
+        })
+
+    def test_vercel_rewrites_proxy_only_required_backend_routes(self):
+        config = json.loads(VERCEL_PATH.read_text(encoding='utf-8'))
+        self.assertEqual(config['rewrites'], [
+            {
+                'source': '/api/:path*',
+                'destination': 'https://pei-ceplan-vr1m.onrender.com/api/:path*',
+            },
+            {
+                'source': '/generar',
+                'destination': 'https://pei-ceplan-vr1m.onrender.com/generar',
+            },
+            {
+                'source': '/downloads/:path*',
+                'destination': 'https://pei-ceplan-vr1m.onrender.com/downloads/:path*',
+            },
+        ])
+        sources = {rule['source'] for rule in config['rewrites']}
+        self.assertNotIn('/matriz_estandar.json', sources)
+        self.assertNotIn('/app_fase4.js', sources)
+        self.assertNotIn('/styles_fase4.css', sources)
+        self.assertNotIn('/plantillas/:path*', sources)
+        self.assertNotIn('/IT_PEI.xlsx', sources)
+
+    def test_frontend_generate_contract_is_json_then_controlled_download(self):
+        html = HTML_PATH.read_text(encoding='utf-8')
+
+        self.assertIn("fetch(apiUrl('/generar')", html)
+        self.assertIn('const texto = await response.text()', html)
+        self.assertIn('result = JSON.parse(texto)', html)
+        self.assertIn("apiUrl(`/downloads/${encodeURIComponent(nombreArchivo)}`)", html)
+        self.assertNotIn('response.blob()', html)
+
+    def test_frontend_escapes_server_validation_details(self):
+        html = HTML_PATH.read_text(encoding='utf-8')
+
+        self.assertIn('function escaparHtml(value)', html)
+        self.assertIn('detallesValidacionHtml(err?.details)', html)
+        self.assertNotIn('${err.message}', html)
 
     def test_frontend_uses_public_matrix_source_without_embedded_catalog(self):
         html = HTML_PATH.read_text(encoding='utf-8')
@@ -80,11 +144,11 @@ class IndexFase4StateTests(unittest.TestCase):
         self.assertIn("fetch(apiUrl('/matriz_estandar.json')", html)
         self.assertTrue(json.loads(MATRIX_PATH.read_text(encoding='utf-8'))['oei'])
 
-    def test_legacy_index_redirects_to_public_root(self):
-        html = INDEX_PATH.read_text(encoding='utf-8')
+    def test_active_entrypoint_is_the_single_public_index(self):
+        html = HTML_PATH.read_text(encoding='utf-8')
 
-        self.assertIn('url=/', html)
-        self.assertNotIn('/frontend/index_fase4.html', html)
+        self.assertTrue(HTML_PATH.is_file())
+        self.assertNotIn('index_fase4.html', html)
 
     def test_payload_keeps_original_catalog_codes_and_indicator_ids(self):
         result = run_inline(

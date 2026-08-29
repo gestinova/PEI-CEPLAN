@@ -6,9 +6,7 @@ Generador local de documentos del Plan Estratégico Institucional (PEI) para gob
 
 ```text
 frontend/
-  index_fase4.html        Interfaz activa y estado del formulario
-  app_fase4.js            Asset JavaScript heredado de la UI
-  styles_fase4.css        Asset CSS heredado de la UI
+  index.html              Interfaz activa y estado completo del formulario
   matriz_estandar.json    Fuente única de OEI, AEI e indicadores
 backend/
   generador_pei_fase4.py  Servidor HTTP, validación y generación DOCX
@@ -41,19 +39,61 @@ El servidor no instala dependencias durante una solicitud. Si falta una dependen
 ```
 
 Abrir `http://127.0.0.1:8000/`. Las rutas de plantillas, JSON, catálogo y salidas se resuelven desde `__file__`, por lo que el comando no depende del directorio actual.
-El puerto se configura con `PORT` y usa `8000` por defecto; el host local usa `127.0.0.1` y puede cambiarse con `PEI_HOST`.
+El puerto se configura con `PORT` y usa `8000` por defecto; el host usa `0.0.0.0` para Render y puede cambiarse con `PEI_HOST`.
 
 ## Contrato HTTP
 
 | Método | Ruta | Uso |
 |---|---|---|
-| `GET` | `/` o `/index_fase4.html` | Frontend público |
+| `GET` | `/` o `/index.html` | Frontend público |
 | `GET` | `/matriz_estandar.json` | Matriz pública usada por el frontend |
 | `GET` | `/api/ue/<codigo>` | Consulta segura del catálogo UE |
 | `POST` | `/generar` | Valida el payload y genera el DOCX |
 | `GET` | `/downloads/<archivo>.docx` | Descarga controlada desde `archivos-gen/` |
 
 El servidor no expone el backend, las plantillas, `IT_PEI.xlsx`, `fichas_tecnicas.json` ni listados arbitrarios del sistema de archivos. Las descargas solo aceptan nombres de salida saneados que existan en `archivos-gen/`.
+
+El frontend usa el origen actual por defecto. Para desplegarlo separado en Vercel, definí explícitamente `window.PEI_API_BASE_URL` antes del script inline de `frontend/index.html` y configurá el backend con `PEI_ALLOWED_ORIGIN` con el origen exacto de Vercel. No se usa una URL Render fija ni un fallback implícito.
+
+## Despliegue separado
+
+### Vercel
+
+La configuración versionada está en `frontend/vercel.json`. Usá estos valores en el proyecto de Vercel:
+
+- **Production Branch:** `main`.
+- **Root Directory:** `frontend`.
+- **Framework Preset:** `Other` / sitio estático.
+- **Build Command:** vacío, sin build.
+- **Output Directory:** `.`.
+
+Con `Root Directory=frontend`, Vercel carga `frontend/vercel.json` y sirve `frontend/index.html` como raíz. Los únicos rewrites configurados son:
+
+- `/api/:path*` hacia `https://pei-ceplan-vr1m.onrender.com/api/:path*`.
+- `/generar` hacia `https://pei-ceplan-vr1m.onrender.com/generar`.
+- `/downloads/:path*` hacia `https://pei-ceplan-vr1m.onrender.com/downloads/:path*`.
+
+No se proxyean archivos fuente, la matriz, plantillas, Excel ni archivos del backend. Con estos rewrites el navegador usa rutas relativas y el flujo es same-origin; no agregues `PEI_API_BASE_URL` al despliegue normal de Vercel.
+
+Para un despliegue estático sin rewrites, el override debe ser explícito y estar antes del script inline, por ejemplo:
+
+```html
+<script>window.PEI_API_BASE_URL = 'https://pei-ceplan-vr1m.onrender.com';</script>
+```
+
+La aplicación estática no transforma automáticamente una variable de entorno de Vercel en `window.PEI_API_BASE_URL`. Ese modo directo requiere CORS en Render y no debe sustituir el fallback same-origin.
+
+### Render
+
+- **Root Directory:** raíz del repositorio, no `backend`.
+- **Build Command:** `pip install -r backend/requirements.txt`.
+- **Branch:** `main`.
+- **Start Command:** `python backend/generador_pei_fase4.py`.
+- **`PEI_HOST`:** `0.0.0.0`.
+- **`PORT`:** dejar que Render lo inyecte; el servidor lo lee y usa `8000` solo como default local.
+- **`PEI_ALLOWED_ORIGIN`:** `https://pei-ceplan.vercel.app` si el frontend accede directamente a Render; debe ser el origen exacto, sin `*`.
+
+El backend responde JSON en `/generar` con `{success,file,message}` y el DOCX se obtiene después desde `/downloads/<archivo>`. CORS se envía únicamente cuando `Origin` coincide con `PEI_ALLOWED_ORIGIN`, también para `/matriz_estandar.json`; el modo same-origin no depende de CORS.
 
 ## Autocompletado UE
 
@@ -79,7 +119,6 @@ Desde la raíz:
 
 ```bash
 pytest -q
-node --check frontend/app_fase4.js
 python -m py_compile backend/generador_pei_fase4.py backend/catalogo_ue.py
 git diff --check
 ```
