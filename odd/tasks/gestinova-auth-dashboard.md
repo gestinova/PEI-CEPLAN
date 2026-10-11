@@ -48,21 +48,21 @@ Expected authored change: approximately 1,200–1,700 lines across application i
   - Checks: auth-focused unit tests, startup/import check, dependency/config review.
   - Commit: `e162d24` (`feat(auth): establish secure application foundation`).
   - Evidence: `python -m unittest -v backend.test_auth` — 4 tests passed; `python -m py_compile backend/app.py backend/models.py` — passed; application factory startup with an isolated in-memory database — passed and listed only login, logout, and authenticated home routes.
-- [ ] **Task 2 — Add administrator-managed users**
+- [x] **Task 2 — Add administrator-managed users**
   - Acceptance: authenticated admins can create accounts, activate/deactivate non-self accounts, and reset passwords; non-admins and anonymous users are denied; CSRF is enforced.
   - Checks: user-management authorization and lifecycle tests.
-  - Commit: pending.
-  - Evidence: pending.
-- [ ] **Task 3 — Protect and account for document generation**
+  - Commit: `801a2d3` (`feat(admin): manage application users`).
+  - Evidence: `python -m unittest -v backend.test_admin backend.test_auth` — 7 tests passed, covering admin-only access, create, activate/deactivate, reset, self-disable prevention, and CSRF.
+- [x] **Task 3 — Protect and account for document generation**
   - Acceptance: generation and download require authentication; one successfully saved DOCX creates one ledger row; failures create none; unique request IDs make retries idempotent; separate requests cannot overwrite outputs; users can only download their own outputs unless administrators are explicitly allowed.
   - Checks: idempotency, failure accounting, output naming, ownership, and compatibility tests.
-  - Commit: pending.
-  - Evidence: pending.
-- [ ] **Task 4 — Deliver billing dashboard, branding, and operational guidance**
+  - Commit: `cbd0317` (`feat(generation): add idempotent billing ledger`).
+  - Evidence: `python -m unittest -v backend.test_generation_accounting backend.test_admin backend.test_auth` — 11 tests passed; successful requests produced one row, retries reused it, failures produced no row/file, output names differed, and ownership was enforced.
+- [x] **Task 4 — Deliver billing dashboard, branding, and operational guidance**
   - Acceptance: GESTINOVA appears on login and application screens; admins see total, per-user, and monthly completed generations; ordinary users cannot access metrics; documentation covers environment, PostgreSQL, admin bootstrap, startup, and security boundaries.
   - Checks: metrics/authorization tests, frontend syntax, full suite, startup/import, configured lint/format checks, structural route/secret spot-check.
-  - Commit: pending.
-  - Evidence: pending.
+  - Commit: `8c9d24f` (`feat(dashboard): add billing metrics and GESTINOVA UI`).
+  - Evidence: `python -m unittest -v` — 14 tests passed; `node --check frontend/app.js` — passed; `python -m py_compile backend/app.py backend/models.py backend/generador.py backend/catalogo.py` — passed; isolated startup check — `startup ok: 16 routes`; `git diff --check` — passed.
 
 ## Acceptance criteria
 
@@ -89,3 +89,6 @@ Expected authored change: approximately 1,200–1,700 lines across application i
 ## Progress log
 
 - Task 1 completed. Rollback boundary: `backend/app.py`, `backend/models.py`, authentication templates/tests, and the four added dependency declarations. Risk remains high because the forecast exceeds 400 lines; local work-unit slicing continues without remote delivery.
+- Task 2 completed. Rollback boundary: administrator routes, `admin_users.html`, and `test_admin.py`.
+- Task 3 completed. Rollback boundary: generation/download routes and `test_generation_accounting.py`; the historical DOCX implementation remains independently intact.
+- Task 4 completed. Rollback boundary: dashboard route/template/test, protected frontend bridge, GESTINOVA presentation CSS/copy, root discovery bridge, and operations documentation. Remote delivery remains intentionally pending under `ask-on-risk`.
