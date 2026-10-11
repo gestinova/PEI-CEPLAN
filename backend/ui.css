@@ -1,0 +1,25 @@
+:root { color-scheme: light; font-family: Inter, system-ui, sans-serif; color: #18312e; background: #f2f6f4; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: linear-gradient(145deg, #f7faf8, #e4eeea); }
+.login-page { display: grid; place-items: center; padding: 2rem; }
+.login-card, .panel, .metric { background: #fff; border: 1px solid #d8e3de; border-radius: 18px; box-shadow: 0 18px 60px #153a3220; padding: 2rem; }
+.login-card { width: min(440px, 100%); }
+.wordmark { color: #146c5b; font-size: 1.15rem; font-weight: 900; letter-spacing: .16em; }
+.eyebrow { color: #6d827d; font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+h1 { font-size: clamp(2rem, 5vw, 3.25rem); margin: .4rem 0 1rem; }
+h2 { margin-top: 0; }
+label { display: grid; gap: .45rem; font-weight: 700; margin: 1rem 0; }
+input { border: 1px solid #b7cbc4; border-radius: 10px; font: inherit; padding: .8rem; }
+button, .primary-link { background: #146c5b; border: 0; border-radius: 10px; color: white; cursor: pointer; display: inline-block; font-weight: 800; padding: .8rem 1.1rem; text-decoration: none; }
+button.secondary { background: transparent; border: 1px solid #90aaa2; color: #173f3a; }
+.alert { background: #fff0ed; border-left: 4px solid #b83e2f; padding: .8rem; }
+.app-header { align-items: center; background: #fff; border-bottom: 1px solid #d8e3de; display: flex; gap: 2rem; justify-content: space-between; padding: 1rem 5%; }
+.app-header nav { display: flex; gap: 1.25rem; margin-left: auto; }
+.app-header a { color: #28544c; font-weight: 700; text-decoration: none; }
+.shell { margin: 0 auto; max-width: 1120px; padding: 4rem 1.5rem; }
+.grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 1.5rem; }
+.metric { display: flex; justify-content: space-between; align-items: center; }
+.metric strong { color: #146c5b; font-size: 3rem; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border-bottom: 1px solid #d8e3de; padding: .8rem; text-align: left; vertical-align: top; }
+td form { display: inline-flex; gap: .5rem; margin: .25rem; }

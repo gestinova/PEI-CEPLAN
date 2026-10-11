@@ -19,6 +19,7 @@
       <span>PERÚ | Centro Nacional de Planeamiento Estratégico - CEPLAN</span>
     </div>
   </div>
+  <div style="padding: 10px 5%; background: #173f3a; color: white; font-weight: 800; letter-spacing: .12em;">GESTINOVA</div>
 
   <div class="container">
     <!-- ENCABEZADO OFICIAL -->
@@ -1056,8 +1057,8 @@ function crearFormularioMeta(ind) {
 
         const response = await fetch(`${baseUrl}/generar`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
+          body: JSON.stringify({ ...payload, generation_request_id: crypto.randomUUID() })
         });
 
         if (!response.ok) {
@@ -1076,8 +1077,8 @@ function crearFormularioMeta(ind) {
           throw new Error(errorMsg);
         }
 
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
+        const result = await response.json();
+        const downloadUrl = result.download_url;
 
         const nombreMunicipio = document.getElementById('nombre_municipio')?.value.trim() || 'Municipio';
         const nombreArchivo = `PEI_${nombreMunicipio.replace(/\s+/g, '_')}.docx`;
@@ -1088,7 +1089,6 @@ function crearFormularioMeta(ind) {
         document.body.appendChild(a);
         a.click();
         a.remove();
-        window.URL.revokeObjectURL(downloadUrl);
 
         msg.className = 'message success';
         msg.style.display = 'block';

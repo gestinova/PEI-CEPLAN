@@ -7,8 +7,8 @@ import uuid
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, session, url_for
-from sqlalchemy import select
+from flask import Flask, Response, abort, g, jsonify, redirect, render_template, request, send_file, session, url_for
+from sqlalchemy import extract, func, select
 from sqlalchemy.exc import IntegrityError
 
 from models import Base, Generation, User, create_database, hash_password, verify_password
@@ -98,6 +98,40 @@ def create_app(config=None):
     @login_required
     def home():
         return render_template("home.html")
+
+    @app.get("/ui.css")
+    def application_styles():
+        return send_file(Path(__file__).parent / "ui.css", mimetype="text/css")
+
+    @app.get("/generator")
+    @login_required
+    def generator_ui():
+        html = (PROJECT_ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+        csrf_meta = f'<meta name="csrf-token" content="{session["csrf_token"]}">'
+        return Response(html.replace("</head>", f"{csrf_meta}</head>"), mimetype="text/html")
+
+    @app.get("/styles.css")
+    @login_required
+    def generator_styles():
+        return send_file(PROJECT_ROOT / "frontend" / "styles.css", mimetype="text/css")
+
+    @app.get("/matriz_estandar.json")
+    @login_required
+    def matrix_data():
+        return send_file(PROJECT_ROOT / "frontend" / "matriz_estandar.json", mimetype="application/json")
+
+    @app.get("/api/ue/<ue_id>")
+    @login_required
+    def executing_unit(ue_id):
+        from catalogo import obtener_ue
+
+        try:
+            unit = obtener_ue(ue_id)
+        except ValueError as error:
+            return jsonify(success=False, error=str(error)), 400
+        if unit is None:
+            return jsonify(success=False, error="Unidad ejecutora no encontrada."), 404
+        return jsonify(success=True, data=unit)
 
     @app.post("/generar")
     @login_required
@@ -210,6 +244,29 @@ def create_app(config=None):
         g.db.commit()
         return redirect(url_for("admin_users"))
 
+    @app.get("/admin/dashboard")
+    @admin_required
+    def admin_dashboard():
+        total = g.db.scalar(select(func.count(Generation.id))) or 0
+        by_user = g.db.execute(
+            select(User.username, func.count(Generation.id))
+            .outerjoin(Generation)
+            .group_by(User.id, User.username)
+            .order_by(User.username)
+        ).all()
+        by_month = g.db.execute(
+            select(
+                extract("year", Generation.completed_at).label("year"),
+                extract("month", Generation.completed_at).label("month"),
+                func.count(Generation.id),
+            )
+            .group_by("year", "month")
+            .order_by("year", "month")
+        ).all()
+        return render_template(
+            "admin_dashboard.html", total=total, by_user=by_user, by_month=by_month
+        )
+
     @app.cli.command("create-admin")
     def create_admin():
         """Create the first administrator from environment variables."""
@@ -222,6 +279,11 @@ def create_app(config=None):
                 raise RuntimeError("The administrator username already exists.")
             database.add(User(username=username, password_hash=hash_password(password), is_admin=True))
             database.commit()
+
+    @app.cli.command("init-db")
+    def init_db():
+        """Create application tables in the configured PostgreSQL database."""
+        Base.metadata.create_all(engine)
 
     return app
 

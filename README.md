@@ -1,87 +1,72 @@
-# PEI-CEPLAN
+# GESTINOVA PEI
 
-Generador local de documentos del Plan Estratégico Institucional (PEI) para gobiernos locales. El flujo permite completar los datos del municipio, consultar el catálogo UE, seleccionar y priorizar OEI/AEI, registrar metas y generar un documento Word.
+Aplicación autenticada para generar documentos del Plan Estratégico Institucional y contabilizar las generaciones completadas para facturación.
 
-## Estructura
+## Inicio rápido
 
-```text
-frontend/
-  index_fase4.html        Interfaz activa y estado del formulario
-  app_fase4.js            Asset JavaScript heredado de la UI
-  styles_fase4.css        Asset CSS heredado de la UI
-  matriz_estandar.json    Fuente única de OEI, AEI e indicadores
-backend/
-  generador_pei_fase4.py  Servidor HTTP, validación y generación DOCX
-  catalogo_ue.py          Lectura segura de IT_PEI.xlsx
-  fichas_tecnicas.json    Fichas técnicas consumidas por el generador
-  requirements.txt        Dependencias reproducibles
-  test_*.py               Pruebas backend y del script inline
-plantillas/               DOCX fuente
-archivos-gen/             Salidas DOCX generadas
-IT_PEI.xlsx               Catálogo UE configurado por defecto
-```
+1. Crear un entorno e instalar dependencias:
 
-La matriz vive en `frontend/matriz_estandar.json` porque también es un recurso público del formulario. Las fichas viven en `backend/fichas_tecnicas.json` porque solo las consume el generador. No se mantienen copias alternativas de esos JSON.
+   ```bash
+   python -m venv .venv
+   .venv/bin/python -m pip install -r backend/requirements.txt
+   ```
 
-## Instalación
+2. Configurar secretos y PostgreSQL:
 
-Desde la raíz del worktree:
+   ```bash
+   export DATABASE_URL='postgresql+psycopg://usuario:contraseña@host/base'
+   export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+   export FLASK_APP=backend/app.py
+   ```
 
-```bash
-python -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements.txt
-```
+3. Crear tablas y el primer administrador:
 
-El servidor no instala dependencias durante una solicitud. Si falta una dependencia, debe instalarse antes de arrancar el proceso.
+   ```bash
+   flask init-db
+   export GESTINOVA_ADMIN_USERNAME='admin'
+   export GESTINOVA_ADMIN_PASSWORD='una-contraseña-larga-y-única'
+   flask create-admin
+   unset GESTINOVA_ADMIN_PASSWORD
+   ```
 
-## Ejecución
+4. Iniciar la aplicación:
 
-```bash
-.venv/bin/python backend/generador_pei_fase4.py
-```
+   ```bash
+   python backend/app.py
+   ```
 
-Abrir `http://127.0.0.1:8000/`. Las rutas de plantillas, JSON, catálogo y salidas se resuelven desde `__file__`, por lo que el comando no depende del directorio actual.
-El puerto se configura con `PORT` y usa `8000` por defecto; el host local usa `127.0.0.1` y puede cambiarse con `PEI_HOST`.
+La aplicación escucha en `127.0.0.1:8000` por defecto. `PEI_HOST` y `PORT` permiten cambiar esos valores. En producción debe ejecutarse detrás de HTTPS para que la cookie de sesión `Secure` sea transmitida.
 
-## Contrato HTTP
+## Seguridad y operación
 
-| Método | Ruta | Uso |
-|---|---|---|
-| `GET` | `/` o `/index_fase4.html` | Frontend público |
-| `GET` | `/matriz_estandar.json` | Matriz pública usada por el frontend |
-| `GET` | `/api/ue/<codigo>` | Consulta segura del catálogo UE |
-| `POST` | `/generar` | Valida el payload y genera el DOCX |
-| `GET` | `/downloads/<archivo>.docx` | Descarga controlada desde `archivos-gen/` |
+| Área | Comportamiento |
+|---|---|
+| Contraseñas | Argon2id con salt aleatorio; nunca se almacena texto plano. |
+| Sesión | Cookie `HttpOnly`, `SameSite=Lax` y `Secure` fuera de pruebas. |
+| CSRF | Login, logout, generación y administración requieren token. |
+| Usuarios | Solo un administrador puede crear, activar, desactivar o restablecer contraseñas. |
+| Base de datos | Producción exige `DATABASE_URL`; no existe fallback SQLite. |
+| Archivos | Backend, base, secretos, plantillas y salidas no son recursos estáticos públicos. |
+| Descargas | Requieren sesión y propiedad del documento; administradores pueden auditar. |
 
-El servidor no expone el backend, las plantillas, `IT_PEI.xlsx`, `fichas_tecnicas.json` ni listados arbitrarios del sistema de archivos. Las descargas solo aceptan nombres de salida saneados que existan en `archivos-gen/`.
+No se ofrece una ruta pública para crear el primer administrador. Las variables `GESTINOVA_ADMIN_*` se usan únicamente por el comando CLI y la contraseña debe eliminarse del entorno inmediatamente después.
 
-## Autocompletado UE
+## Facturación e idempotencia
 
-En el campo `Código UE`, presionar **Enter** consulta `/api/ue/<codigo>` y completa municipio, provincia, región y período cuando el catálogo los contiene. La URL usa el origen actual; puede configurarse un prefijo mediante `window.PEI_API_BASE_URL` antes del script para autocompletado, generación y descargas si el frontend se sirve separado.
+Una generación se registra únicamente después de guardar correctamente el DOCX final. Cada solicitud debe incluir un UUID `generation_request_id`; repetirlo devuelve la generación existente sin crear otro cargo. El nombre final usa ese UUID (`PEI_<uuid>.docx`), evitando que dos documentos del mismo municipio se sobrescriban.
 
-`IT_PEI.xlsx` se busca por defecto en la raíz del proyecto. También puede configurarse una ruta explícita con `PEI_IT_PEI_PATH`; las rutas relativas se resuelven desde la raíz del proyecto, no desde el cwd. Si no existe, el catálogo queda vacío y la API devuelve un error claro para códigos no encontrados.
-
-## Generación y reglas de negocio
-
-- El payload se valida completamente antes de abrir una plantilla: tipos, formatos, jerarquía OEI/AEI, indicadores, prioridades, período y valores no negativos.
-- Se conservan los códigos e IDs originales en payload, JSON y lookups.
-- El DOCX muestra OEI secuenciales según el orden elegido y AEI secuenciales desde `01` dentro de cada OEI visible.
-- Solo se generan los OEI, AEI e indicadores seleccionados, respetando sus ordinales.
-- Los años del período se expanden dinámicamente. La línea base enviada por el formulario prevalece sobre el JSON cuando contiene año y valor.
-- La oración de Anexo B.1 que comienza con `El PEI está articulado al` se formatea en Arial Narrow de 12 puntos.
-- El número de ordenanza reemplaza el placeholder correspondiente.
-- Las notas de fichas quedan fuera de la tabla; se limpian placeholders, párrafos sobrantes y saltos de página innecesarios, y se normalizan los bordes T0.
-- Los temporales se crean con `tempfile` y se eliminan aun cuando la generación falla. Las salidas se escriben en `archivos-gen/`.
+El panel **Facturación** está restringido a administradores y presenta el total histórico, el total por usuario y el total por mes calendario.
 
 ## Pruebas
 
-Desde la raíz:
+Las pruebas inyectan SQLite en memoria exclusivamente como base aislada y determinista; producción no lo usa.
 
 ```bash
-pytest -q
-node --check frontend/app_fase4.js
-python -m py_compile backend/generador_pei_fase4.py backend/catalogo_ue.py
+python -m unittest -v
+python -m unittest -v backend.test_auth backend.test_admin backend.test_generation_accounting backend.test_dashboard
+node --check frontend/app.js
+python -m py_compile backend/app.py backend/models.py backend/generador.py backend/catalogo.py
 git diff --check
 ```
 
-La suite cubre validación de payload, catálogo y `/api/ue`, autocompletado por Enter, estado del frontend, períodos, ordinales, generación DOCX, líneas base, tipografía, notas, limpieza XML, temporales y exposición de archivos.
+La lógica histórica de armado del DOCX permanece en `backend/generador.py`. Flask controla autenticación, autorización, persistencia, idempotencia y nombres de salida, y llama esa implementación con una ruta final explícita.
