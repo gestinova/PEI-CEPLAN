@@ -96,6 +96,57 @@ def create_app(config=None):
     def home():
         return render_template("home.html")
 
+    @app.get("/admin/users")
+    @admin_required
+    def admin_users():
+        users = g.db.scalars(select(User).order_by(User.username)).all()
+        return render_template("admin_users.html", users=users, error=None)
+
+    @app.post("/admin/users")
+    @admin_required
+    def admin_create_user():
+        validate_csrf()
+        username = request.form.get("username", "").strip().lower()
+        password = request.form.get("password", "")
+        if not username or len(username) > 80 or not username.replace("-", "").replace("_", "").isalnum():
+            abort(400, "Invalid username")
+        if g.db.scalar(select(User).where(User.username == username)):
+            abort(409, "Username already exists")
+        try:
+            password_hash = hash_password(password)
+        except ValueError as error:
+            abort(400, str(error))
+        g.db.add(User(username=username, password_hash=password_hash, is_admin=False))
+        g.db.commit()
+        return redirect(url_for("admin_users"))
+
+    @app.post("/admin/users/<int:user_id>/status")
+    @admin_required
+    def admin_user_status(user_id):
+        validate_csrf()
+        if user_id == g.user.id:
+            abort(400, "Administrators cannot disable their own account.")
+        user = g.db.get(User, user_id)
+        if not user:
+            abort(404)
+        user.is_active = request.form.get("active") == "true"
+        g.db.commit()
+        return redirect(url_for("admin_users"))
+
+    @app.post("/admin/users/<int:user_id>/password")
+    @admin_required
+    def admin_user_password(user_id):
+        validate_csrf()
+        user = g.db.get(User, user_id)
+        if not user:
+            abort(404)
+        try:
+            user.password_hash = hash_password(request.form.get("password", ""))
+        except ValueError as error:
+            abort(400, str(error))
+        g.db.commit()
+        return redirect(url_for("admin_users"))
+
     @app.cli.command("create-admin")
     def create_admin():
         """Create the first administrator from environment variables."""
