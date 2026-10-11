@@ -3,13 +3,15 @@
 import hmac
 import os
 import secrets
+import uuid
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, abort, g, redirect, render_template, request, session, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-from models import Base, User, create_database, hash_password, verify_password
+from models import Base, Generation, User, create_database, hash_password, verify_password
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +40,7 @@ def create_app(config=None):
     engine, session_factory = create_database(database_url)
     app.extensions["db_engine"] = engine
     app.extensions["db_session_factory"] = session_factory
+    app.extensions["document_generator"] = config.get("DOCUMENT_GENERATOR", generate_document)
     if testing or config.get("CREATE_TABLES"):
         Base.metadata.create_all(engine)
 
@@ -95,6 +98,66 @@ def create_app(config=None):
     @login_required
     def home():
         return render_template("home.html")
+
+    @app.post("/generar")
+    @login_required
+    def generate():
+        validate_csrf()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(success=False, error="Solicitud JSON inválida."), 400
+        try:
+            request_id = str(uuid.UUID(str(data.get("generation_request_id", ""))))
+        except ValueError:
+            return jsonify(success=False, error="generation_request_id inválido."), 422
+        existing = g.db.scalar(
+            select(Generation).where(Generation.generation_request_id == request_id)
+        )
+        if existing:
+            if existing.user_id != g.user.id and not g.user.is_admin:
+                abort(403)
+            return jsonify(generation_response(existing, idempotent=True))
+
+        municipality = str(data.get("nombre_municipio", ""))[:120]
+        output_name = f"PEI_{request_id}.docx"
+        output_path = PROJECT_ROOT / "archivos-gen" / output_name
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            app.extensions["document_generator"](data, output_path)
+            if not output_path.is_file():
+                raise RuntimeError("The document generator did not save an output.")
+            generation = Generation(
+                generation_request_id=request_id,
+                user_id=g.user.id,
+                output_name=output_name,
+                municipality=municipality,
+            )
+            g.db.add(generation)
+            g.db.commit()
+        except IntegrityError:
+            g.db.rollback()
+            generation = g.db.scalar(
+                select(Generation).where(Generation.generation_request_id == request_id)
+            )
+            if generation is None:
+                output_path.unlink(missing_ok=True)
+                raise
+        except Exception:
+            g.db.rollback()
+            output_path.unlink(missing_ok=True)
+            raise
+        return jsonify(generation_response(generation, idempotent=False)), 201
+
+    @app.get("/downloads/<path:output_name>")
+    @login_required
+    def download(output_name):
+        generation = g.db.scalar(select(Generation).where(Generation.output_name == output_name))
+        if not generation or (generation.user_id != g.user.id and not g.user.is_admin):
+            abort(404)
+        output_path = PROJECT_ROOT / "archivos-gen" / generation.output_name
+        if not output_path.is_file():
+            abort(404)
+        return send_file(output_path, as_attachment=True, download_name=generation.output_name)
 
     @app.get("/admin/users")
     @admin_required
@@ -189,6 +252,24 @@ def admin_required(view):
         return view(*args, **kwargs)
 
     return wrapped
+
+
+def generation_response(generation, idempotent):
+    return {
+        "success": True,
+        "generation_request_id": generation.generation_request_id,
+        "download_url": url_for("download", output_name=generation.output_name),
+        "idempotent": idempotent,
+    }
+
+
+def generate_document(data, output_path):
+    """Call the existing document implementation while controlling its final path."""
+    from generador import PEIHandler, validar_payload
+
+    validar_payload(data)
+    handler = object.__new__(PEIHandler)
+    handler.generar_documento(data, output_path=output_path)
 
 
 if __name__ == "__main__":
