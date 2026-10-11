@@ -381,6 +381,7 @@
     </div>
   </div>
 
+  <script src="/generation_retry.js"></script>
   <script>
 
 
@@ -1041,6 +1042,8 @@ function crearFormularioMeta(ind) {
     // ============================================
     // GENERACIÓN Y EXPORTACIÓN PEI (EN MEMORIA)
     // ============================================
+    const generationRetry = createGenerationRetryId(() => crypto.randomUUID());
+
     async function generarDocumento() {
       const btn = document.getElementById('btnGenerar');
       const msg = document.getElementById('message');
@@ -1058,7 +1061,7 @@ function crearFormularioMeta(ind) {
         const response = await fetch(`${baseUrl}/generar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
-          body: JSON.stringify({ ...payload, generation_request_id: crypto.randomUUID() })
+          body: JSON.stringify({ ...payload, generation_request_id: generationRetry.forPayload(payload) })
         });
 
         if (!response.ok) {
@@ -1078,6 +1081,7 @@ function crearFormularioMeta(ind) {
         }
 
         const result = await response.json();
+        generationRetry.confirmSuccess();
         const downloadUrl = result.download_url;
 
         const nombreMunicipio = document.getElementById('nombre_municipio')?.value.trim() || 'Municipio';

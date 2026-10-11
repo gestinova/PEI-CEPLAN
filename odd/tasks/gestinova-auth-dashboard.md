@@ -39,7 +39,7 @@ Expected authored change: approximately 1,200–1,700 lines across application i
 | 3 | Protected generation ledger | 350–500 | delegated | More than two non-trivial files: generation integration, persistence, tests/frontend |
 | 4 | Dashboard, branding, and operations docs | 300–450 | delegated | More than two non-trivial files: dashboard routes/templates/styles, tests/docs |
 
-`delegated` records the ODD size trigger and intended review slicing. The user explicitly required autonomous non-delegated execution, so implementation remains inline in this session.
+`delegated` records both the ODD size trigger and the actual execution route; the implementation work was delegated.
 
 ## Stable task checklist
 
@@ -92,3 +92,6 @@ Expected authored change: approximately 1,200–1,700 lines across application i
 - Task 2 completed. Rollback boundary: administrator routes, `admin_users.html`, and `test_admin.py`.
 - Task 3 completed. Rollback boundary: generation/download routes and `test_generation_accounting.py`; the historical DOCX implementation remains independently intact.
 - Task 4 completed. Rollback boundary: dashboard route/template/test, protected frontend bridge, GESTINOVA presentation CSS/copy, root discovery bridge, and operations documentation. Remote delivery remains intentionally pending under `ask-on-risk`.
+- Bounded correction: client retries preserve an ID only for the same payload until confirmed success; generation is serialized per request ID (with PostgreSQL advisory locking), conflict ownership is revalidated, and deterministic client/backend retry tests cover the contract.
+  - Checks: `python -m unittest -v` — 16 passed; `python -m unittest -v backend.test_generation_accounting` — 6 passed; `node frontend/test_generation_retry.js`, `node --check frontend/generation_retry.js`, `node --check frontend/app.js`, and `git diff --check` — passed.
+  - Commit: `fix(generation): make retries concurrency safe` (this correction work unit).

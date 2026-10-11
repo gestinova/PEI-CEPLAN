@@ -1,5 +1,6 @@
 import sys
 import tempfile
+import threading
 import unittest
 import uuid
 from pathlib import Path
@@ -27,7 +28,7 @@ class GenerationAccountingTests(unittest.TestCase):
 
         self.app = create_app({
             "TESTING": True,
-            "DATABASE_URL": "sqlite+pysqlite:///:memory:",
+            "DATABASE_URL": f"sqlite+pysqlite:///{Path(self.tempdir.name) / 'test.db'}?check_same_thread=false",
             "DOCUMENT_GENERATOR": generator,
         })
         self.client = self.app.test_client()
@@ -90,6 +91,48 @@ class GenerationAccountingTests(unittest.TestCase):
         first = self.post_generation(str(uuid.uuid4())).get_json()["download_url"]
         second = self.post_generation(str(uuid.uuid4())).get_json()["download_url"]
         self.assertNotEqual(first, second)
+
+    def test_concurrent_retry_generates_and_bills_once(self):
+        request_id = str(uuid.uuid4())
+        entered, release = threading.Event(), threading.Event()
+        calls, statuses = [], []
+
+        def generator(data, output_path):
+            calls.append(output_path)
+            entered.set()
+            release.wait(2)
+            output_path.write_bytes(b"docx")
+
+        self.app.extensions["document_generator"] = generator
+
+        def submit():
+            client = self.app.test_client()
+            client.get("/login")
+            with client.session_transaction() as browser_session:
+                token = browser_session["csrf_token"]
+            client.post("/login", data={"csrf_token": token, "username": "member", "password": "member password secure"})
+            with client.session_transaction() as browser_session:
+                token = browser_session["csrf_token"]
+            statuses.append(client.post("/generar", json={"generation_request_id": request_id}, headers={"X-CSRF-Token": token}).status_code)
+
+        first = threading.Thread(target=submit)
+        second = threading.Thread(target=submit)
+        first.start()
+        self.assertTrue(entered.wait(2))
+        second.start()
+        release.set()
+        first.join()
+        second.join()
+        self.assertEqual(sorted(statuses), [200, 201])
+        self.assertEqual(len(calls), 1)
+        with self.app.extensions["db_session_factory"]() as database:
+            self.assertEqual(database.query(Generation).count(), 1)
+
+    def test_retry_request_id_cannot_cross_owners(self):
+        request_id = str(uuid.uuid4())
+        self.assertEqual(self.post_generation(request_id).status_code, 201)
+        self.token = self.login("other", "other password secure")
+        self.assertEqual(self.post_generation(request_id).status_code, 403)
 
 
 if __name__ == "__main__":

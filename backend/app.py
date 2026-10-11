@@ -3,18 +3,30 @@
 import hmac
 import os
 import secrets
+import threading
 import uuid
+from collections import defaultdict
 from functools import wraps
 from pathlib import Path
 
 from flask import Flask, Response, abort, g, jsonify, redirect, render_template, request, send_file, session, url_for
-from sqlalchemy import extract, func, select
+from sqlalchemy import extract, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from models import Base, Generation, User, create_database, hash_password, verify_password
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+GENERATION_LOCKS = defaultdict(threading.Lock)
+
+
+def serialize_generation(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        data = request.get_json(silent=True) or {}
+        with GENERATION_LOCKS[str(data.get("generation_request_id", ""))]:
+            return function(*args, **kwargs)
+    return wrapped
 
 
 def create_app(config=None):
@@ -115,6 +127,11 @@ def create_app(config=None):
     def generator_styles():
         return send_file(PROJECT_ROOT / "frontend" / "styles.css", mimetype="text/css")
 
+    @app.get("/generation_retry.js")
+    @login_required
+    def generation_retry_script():
+        return send_file(PROJECT_ROOT / "frontend" / "generation_retry.js", mimetype="text/javascript")
+
     @app.get("/matriz_estandar.json")
     @login_required
     def matrix_data():
@@ -135,6 +152,7 @@ def create_app(config=None):
 
     @app.post("/generar")
     @login_required
+    @serialize_generation
     def generate():
         validate_csrf()
         data = request.get_json(silent=True)
@@ -144,6 +162,8 @@ def create_app(config=None):
             request_id = str(uuid.UUID(str(data.get("generation_request_id", ""))))
         except ValueError:
             return jsonify(success=False, error="generation_request_id inválido."), 422
+        if g.db.bind.dialect.name == "postgresql":
+            g.db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:id, 0))"), {"id": request_id})
         existing = g.db.scalar(
             select(Generation).where(Generation.generation_request_id == request_id)
         )
@@ -176,6 +196,9 @@ def create_app(config=None):
             if generation is None:
                 output_path.unlink(missing_ok=True)
                 raise
+            if generation.user_id != g.user.id and not g.user.is_admin:
+                abort(403)
+            return jsonify(generation_response(generation, idempotent=True))
         except Exception:
             g.db.rollback()
             output_path.unlink(missing_ok=True)
