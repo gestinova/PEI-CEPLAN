@@ -43,11 +43,11 @@ Expected authored change: approximately 1,200–1,700 lines across application i
 
 ## Stable task checklist
 
-- [ ] **Task 1 — Establish secure Flask authentication and persistence**
+- [x] **Task 1 — Establish secure Flask authentication and persistence**
   - Acceptance: app factory starts without remote access; production configuration requires `DATABASE_URL` and `SECRET_KEY`; users are Argon2-hashed; login/logout and active-user checks work; first admin can be created without a public bootstrap route.
   - Checks: auth-focused unit tests, startup/import check, dependency/config review.
-  - Commit: pending.
-  - Evidence: pending.
+  - Commit: `e162d24` (`feat(auth): establish secure application foundation`).
+  - Evidence: `python -m unittest -v backend.test_auth` — 4 tests passed; `python -m py_compile backend/app.py backend/models.py` — passed; application factory startup with an isolated in-memory database — passed and listed only login, logout, and authenticated home routes.
 - [ ] **Task 2 — Add administrator-managed users**
   - Acceptance: authenticated admins can create accounts, activate/deactivate non-self accounts, and reset passwords; non-admins and anonymous users are denied; CSRF is enforced.
   - Checks: user-management authorization and lifecycle tests.
@@ -88,4 +88,4 @@ Expected authored change: approximately 1,200–1,700 lines across application i
 
 ## Progress log
 
-The file and Engram mirror are updated after every completed task with the commit SHA, exact checks, result, and any changed risk.
+- Task 1 completed. Rollback boundary: `backend/app.py`, `backend/models.py`, authentication templates/tests, and the four added dependency declarations. Risk remains high because the forecast exceeds 400 lines; local work-unit slicing continues without remote delivery.
