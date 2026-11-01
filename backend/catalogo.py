@@ -137,7 +137,7 @@ def _leer_catalogo(path):
             catalogo = {}
             catalogo.update(_filas_de_hoja(workbook, 'IT PEI', ('Periodo PEI',)))
             catalogo.update(_filas_de_hoja(workbook, 'Data_UEs', ('Ult.PEI',)))
-            print(f"✅ Catálogo de UEs cargado con éxito: {len(catalogo)} entidades.")
+            print(f"Catalogo de UEs cargado: {len(catalogo)} entidades.")
             return catalogo
         finally:
             close = getattr(workbook, 'close', None)
@@ -165,7 +165,7 @@ def cargar_catalogo_ues(path=None):
     if cache_key[1] is None:
         _catalogo_cache = {}
         _catalogo_cache_key = cache_key
-        print(f"⚠️ AVISO: No se encontró el catálogo Excel en: {resolved_path}")
+        print(f"AVISO: No se encontro el catalogo Excel en: {resolved_path}")
         return _catalogo_cache
 
     _catalogo_cache = _leer_catalogo(resolved_path)
